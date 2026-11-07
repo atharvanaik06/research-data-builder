@@ -138,6 +138,7 @@ docker compose up --build
 - [Transformation engine](docs/ENGINE.md)
 - [Validation and research bundles](docs/BUNDLES.md)
 - [Authentication and browser sessions](docs/AUTHENTICATION.md)
+- [Adversarial review findings and engineering backlog](docs/REVIEW_FINDINGS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 
 ## Current status
