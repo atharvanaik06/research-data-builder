@@ -6,6 +6,7 @@ Create Date: 2026-11-08
 """
 
 from collections.abc import Sequence
+from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -16,7 +17,7 @@ down_revision: str | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-LEGACY_OWNER_ID = "00000000-0000-4000-8000-000000000007"
+LEGACY_OWNER_ID = UUID("00000000-0000-4000-8000-000000000007")
 
 
 def upgrade() -> None:
