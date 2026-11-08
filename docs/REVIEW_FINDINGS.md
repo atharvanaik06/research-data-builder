@@ -15,7 +15,7 @@ The ordinary project gates were healthy at the time of review:
 - 99 local tests passed; three PostgreSQL tests were skipped because no local test database was configured.
 - The latest GitHub Actions run passed all 102 tests with PostgreSQL.
 - Coverage was 91.26%.
-- Alembic compiled through migration `0005`.
+- Alembic compiled through migration `0006`.
 - The Git working tree was clean.
 - Docker and Compose could not be rerun locally because Docker was not installed on the review machine.
 
@@ -32,25 +32,22 @@ The findings below demonstrate that high line and branch coverage does not yet c
 
 ## Confirmed findings
 
-### RDB-001 — Research endpoints are not authenticated or authorized
+### RDB-001 — Research endpoints were not authenticated or authorized
 
 **Severity:** P0  
-**Type:** Known Phase 7 gap and current deployment blocker  
-**Status:** Open
+**Type:** Phase 7 deployment blocker
+**Status:** Resolved
 
-Only `GET /api/v1/auth/me` uses the authenticated-user boundary. Recipe, version, build, preview, validation, lineage, comparison, export-listing, execution, and download endpoints remain anonymous.
+Every private research route now uses the authenticated-user boundary. Recipes and builds have non-null owners; versions, validation, lineage, comparison, exports, execution, and downloads derive authorization through those owned records.
 
-The generated OpenAPI document contained no security scheme for either `GET /api/v1/recipes` or `GET /api/v1/exports/{export_id}/download`.
+Repository lookups include the current owner and return not found for another user's IDs. The generated OpenAPI document advertises the browser-session cookie on private operations. PostgreSQL integration coverage proves that two users can build identical recipe content without seeing each other's recipes, versions, builds, or exports.
 
-An anonymous caller can potentially follow this path:
+An anonymous caller is stopped before database access:
 
 ```text
-list recipes
-→ inspect recipe versions
-→ plan or reuse a build
-→ obtain its build ID
-→ inspect results and exports
-→ download artifacts
+request private route
+→ no valid browser session
+→ 401 Unauthorized
 ```
 
 Relevant code:
@@ -61,12 +58,12 @@ Relevant code:
 
 Resolution checklist:
 
-- [ ] Add an owner foreign key to recipes.
-- [ ] Derive version, build, validation, lineage, comparison, and export access through owned recipes.
-- [ ] Apply the authenticated-user dependency to every private route.
-- [ ] Return `404` rather than revealing whether another user's resource exists.
-- [ ] Add two-user isolation tests for every read and mutation route.
-- [ ] Add an OpenAPI cookie security scheme.
+- [x] Add an owner foreign key to recipes.
+- [x] Derive version, build, validation, lineage, comparison, and export access through owned recipes.
+- [x] Apply the authenticated-user dependency to every private route.
+- [x] Return `404` rather than revealing whether another user's resource exists.
+- [x] Add two-user isolation tests across the repository access boundary.
+- [x] Add an OpenAPI cookie security scheme.
 
 ### RDB-002 — A successful build can be rerun and overwritten
 

@@ -253,12 +253,15 @@ Delivered so far:
 - Researcher registration, login, logout, and current-account endpoints.
 - Memory-hard salted password hashing without storing plaintext credentials.
 - Opaque HTTP-only browser sessions with hashed token storage, expiry, and revocation.
-- Reusable authenticated-user boundary for the ownership layer.
-- Migration `0005` and PostgreSQL session-lifecycle coverage.
+- Owner foreign keys on recipes and builds, with inherited protection for versions and outputs.
+- Authenticated access on every private research and artifact route.
+- Not-found behavior that does not disclose another user's resource existence.
+- OpenAPI cookie-security documentation and two-user PostgreSQL isolation coverage.
+- Migrations `0005` and `0006` with PostgreSQL lifecycle and ownership coverage.
 
 Deliverables:
 
-- Authentication and recipe/build ownership.
+- Authentication and recipe/build ownership. **Complete.**
 - Background build queue and workers.
 - Job progress and cancellation policy.
 - Idempotent job handling and terminal failure states.

@@ -1,6 +1,6 @@
 # Authentication and Browser Sessions
 
-Phase 7 begins with researcher accounts and revocable server-side sessions. Authentication is intentionally separate from recipe ownership, which is the next Phase 7 slice.
+Phase 7 provides researcher accounts, revocable server-side sessions, and ownership enforcement for every private research resource.
 
 ## Account flow
 
@@ -42,8 +42,10 @@ Passwords must contain between 12 and 128 characters. Email addresses are trimme
 | `RESEARCH_DATA_SESSION_COOKIE_NAME` | `research_data_session` | Browser cookie name. |
 | `RESEARCH_DATA_SESSION_TTL_HOURS` | `168` | Session lifetime, bounded to 1 hour–90 days. |
 
-Migration `0005` creates `users` and `user_sessions`. Repository methods flush but never commit; API services retain transaction ownership.
+Migration `0005` creates `users` and `user_sessions`. Migration `0006` assigns an owner to every recipe and build. Repository methods flush but never commit; API services retain transaction ownership.
 
 ## Security boundary
 
-The reusable `require_user` dependency resolves the current user from the hashed session record. The next slice will apply it to recipe, build, validation, lineage, comparison, and export endpoints while adding ownership foreign keys and isolation tests.
+The reusable `require_user` dependency resolves the current user from the hashed session record. Every recipe, version, build, validation, lineage, comparison, export, execution, and artifact-download route requires that user.
+
+Repositories scope lookups by the current user's ID. A request for another user's resource receives the same `404` response as a request for an ID that does not exist, so the API does not reveal private resource existence. The OpenAPI document advertises the HTTP-only cookie security scheme on every private route.

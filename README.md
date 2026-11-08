@@ -47,9 +47,9 @@ The local MVP will support:
 - exact input and transformation lineage;
 - fixture-driven tests that do not depend on live provider availability.
 
-Recipe ownership, a browser interface, background queues, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
+Browser interfaces, background queues, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
 
-Phase 7 is now in progress. Secure user accounts and revocable browser sessions are implemented; ownership enforcement and asynchronous builds are the next slices.
+Phase 7 is now in progress. Secure user accounts, revocable browser sessions, and private per-user research ownership are implemented; asynchronous builds are the next product slice.
 
 ## Current product
 

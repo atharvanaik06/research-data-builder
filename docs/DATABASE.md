@@ -110,16 +110,20 @@ Export records store format, artifact location, row count, schema, file size, an
 
 The service records validation failures without exports. For successful builds it records validation, lineage, every artifact, dataset checksum, bundle path, and the `succeeded` transition in one transaction after the complete bundle exists.
 
-## Implemented authentication schema
+## Implemented authentication and ownership schema
 
-Migration `0005` begins Phase 7 with:
+Migrations `0005` and `0006` begin Phase 7 with:
 
 ```text
 users
-└── user_sessions
+├── user_sessions
+├── dataset_recipes
+└── build_runs
 ```
 
-`users` stores normalized unique email addresses, salted password hashes, and account state. `user_sessions` stores only a hash of each opaque browser token, plus expiry, revocation, and last-use timestamps. Deleting a user cascades to their sessions; research ownership is added in the following migration.
+`users` stores normalized unique email addresses, salted password hashes, and account state. `user_sessions` stores only a hash of each opaque browser token, plus expiry, revocation, and last-use timestamps. Deleting a user cascades to their sessions.
+
+Every recipe and build has a non-null owner foreign key. Versions and output records inherit access through their recipe or build. Migration `0006` assigns pre-existing local data to an inactive legacy owner so upgrading does not discard work. Build identity is unique within a frozen recipe version, allowing two users to build identical recipes without sharing mutable database records.
 
 ## Existing invariants
 
