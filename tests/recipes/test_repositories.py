@@ -26,12 +26,14 @@ async def test_recipe_repository_creates_and_updates_validated_drafts() -> None:
     session = mock_session()
     repository = RecipeRepository(session)
     definition = RecipeDefinition.model_validate(valid_recipe())
+    owner_id = uuid4()
 
-    recipe = await repository.create(definition)
+    recipe = await repository.create(owner_id, definition)
     changed = definition.model_copy(update={"name": "Updated panel"})
     await repository.update(recipe, changed)
 
     assert recipe.name == "Updated panel"
+    assert recipe.owner_id == owner_id
     assert recipe.draft_content["name"] == "Updated panel"
     assert len(recipe.draft_hash) == 64
     session.add.assert_called_once_with(recipe)
@@ -44,6 +46,7 @@ async def test_recipe_version_freeze_creates_ordered_normalized_rows() -> None:
     definition = RecipeDefinition.model_validate(valid_recipe())
     recipe = DatasetRecipe(
         id=uuid4(),
+        owner_id=uuid4(),
         name=definition.name,
         description=definition.description,
         draft_content=definition.model_dump(mode="json"),
@@ -69,6 +72,7 @@ async def test_freezing_identical_content_reuses_existing_version() -> None:
     definition = RecipeDefinition.model_validate(valid_recipe())
     recipe = DatasetRecipe(
         id=uuid4(),
+        owner_id=uuid4(),
         name=definition.name,
         draft_content=definition.model_dump(mode="json"),
         draft_hash="a" * 64,
@@ -87,7 +91,7 @@ async def test_freezing_identical_content_reuses_existing_version() -> None:
 async def test_recipe_service_reports_missing_recipe() -> None:
     session = mock_session()
     session.scalar.return_value = None
-    service = RecipeService(RecipeRepository(session), RecipeVersionRepository(session))
+    service = RecipeService(RecipeRepository(session), RecipeVersionRepository(session), uuid4())
 
     with pytest.raises(RecipeNotFoundError):
         await service.freeze(uuid4())

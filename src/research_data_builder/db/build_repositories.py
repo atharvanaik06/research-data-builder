@@ -26,12 +26,18 @@ class BuildRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create_or_get(self, recipe_version_id: UUID, plan: BuildPlan) -> PlannedBuildResult:
-        existing = await self.get_by_identity(plan.build_identity)
+    async def create_or_get(
+        self,
+        owner_id: UUID,
+        recipe_version_id: UUID,
+        plan: BuildPlan,
+    ) -> PlannedBuildResult:
+        existing = await self.get_by_identity(owner_id, recipe_version_id, plan.build_identity)
         if existing is not None:
             return PlannedBuildResult(build=existing, created=False)
 
         build = BuildRun(
+            owner_id=owner_id,
             recipe_version_id=recipe_version_id,
             status=BuildStatus.PLANNED,
             build_identity=plan.build_identity,
@@ -54,12 +60,23 @@ class BuildRepository:
         await self.session.flush()
         return PlannedBuildResult(build=build, created=True)
 
-    async def get(self, build_id: UUID) -> BuildRun | None:
-        return await self.session.scalar(select(BuildRun).where(BuildRun.id == build_id))
-
-    async def get_by_identity(self, build_identity: str) -> BuildRun | None:
+    async def get(self, build_id: UUID, owner_id: UUID) -> BuildRun | None:
         return await self.session.scalar(
-            select(BuildRun).where(BuildRun.build_identity == build_identity)
+            select(BuildRun).where(BuildRun.id == build_id, BuildRun.owner_id == owner_id)
+        )
+
+    async def get_by_identity(
+        self,
+        owner_id: UUID,
+        recipe_version_id: UUID,
+        build_identity: str,
+    ) -> BuildRun | None:
+        return await self.session.scalar(
+            select(BuildRun).where(
+                BuildRun.owner_id == owner_id,
+                BuildRun.recipe_version_id == recipe_version_id,
+                BuildRun.build_identity == build_identity,
+            )
         )
 
     async def mark_retrieving(self, build: BuildRun) -> BuildRun:

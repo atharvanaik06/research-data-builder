@@ -42,6 +42,7 @@ from research_data_builder.db.models import (
     DatasetValidationResult,
     ExportArtifact,
     RecipeVersion,
+    User,
 )
 from research_data_builder.providers import (
     DataProvider,
@@ -55,6 +56,13 @@ from research_data_builder.recipes.codec import canonical_recipe_hash
 from research_data_builder.recipes.schemas import RecipeDefinition
 from tests.engine.test_executor import ObservationConnector, version_and_plan
 from tests.recipes.test_schemas import valid_recipe
+
+TEST_USER = User(
+    id=uuid4(),
+    email="owner@example.com",
+    password_hash="test-only",
+    is_active=True,
+)
 
 
 class TransactionContext:
@@ -123,6 +131,7 @@ def api_request(
 def stored_recipe(definition: RecipeDefinition) -> DatasetRecipe:
     return DatasetRecipe(
         id=uuid4(),
+        owner_id=TEST_USER.id,
         name=definition.name,
         description=definition.description,
         draft_content=definition.model_dump(mode="json"),
@@ -144,11 +153,14 @@ def stored_version(recipe: DatasetRecipe, definition: RecipeDefinition) -> Recip
 async def test_recipe_api_creates_imports_reads_lists_and_updates_drafts() -> None:
     definition = RecipeDefinition.model_validate(valid_recipe())
 
-    created = await create_recipe(definition, api_request(FakeApiDatabase(session_with())))
+    created = await create_recipe(
+        definition, api_request(FakeApiDatabase(session_with())), TEST_USER
+    )
     assert created.name == "European macro panel"
 
     imported = await import_recipe(
         api_request(FakeApiDatabase(session_with())),
+        TEST_USER,
         document="""
 name: Imported
 entities: [CZE]
@@ -165,14 +177,16 @@ output_frequency: annual
     assert imported.name == "Imported"
 
     recipe = stored_recipe(definition)
-    fetched = await get_recipe(recipe.id, api_request(FakeApiDatabase(session_with(recipe))))
+    fetched = await get_recipe(
+        recipe.id, api_request(FakeApiDatabase(session_with(recipe))), TEST_USER
+    )
     assert fetched.id == recipe.id
 
     scalar_result = MagicMock()
     scalar_result.__iter__.return_value = iter([recipe])
     list_session = session_with()
     list_session.scalars.return_value = scalar_result
-    listed = await list_recipes(api_request(FakeApiDatabase(list_session)))
+    listed = await list_recipes(api_request(FakeApiDatabase(list_session)), TEST_USER)
     assert [item.id for item in listed] == [recipe.id]
 
     updated_definition = definition.model_copy(update={"name": "Updated"})
@@ -180,11 +194,17 @@ output_frequency: annual
         recipe.id,
         updated_definition,
         api_request(FakeApiDatabase(session_with(recipe))),
+        TEST_USER,
     )
     assert updated.name == "Updated"
 
     with pytest.raises(HTTPException) as invalid_import:
-        await import_recipe(api_request(FakeApiDatabase()), document="not: [valid", format="yaml")
+        await import_recipe(
+            api_request(FakeApiDatabase()),
+            TEST_USER,
+            document="not: [valid",
+            format="yaml",
+        )
     assert invalid_import.value.status_code == 422
 
 
@@ -198,12 +218,13 @@ async def test_recipe_api_freezes_lists_and_exports_versions() -> None:
         recipe.id,
         api_request(FakeApiDatabase(freeze_session)),
         Response(),
+        TEST_USER,
     )
     assert frozen.version_number == 1
 
     version = stored_version(recipe, definition)
     fetched = await get_recipe_version(
-        version.id, api_request(FakeApiDatabase(session_with(version)))
+        version.id, api_request(FakeApiDatabase(session_with(version))), TEST_USER
     )
     assert fetched.content_hash == version.content_hash
 
@@ -211,12 +232,15 @@ async def test_recipe_api_freezes_lists_and_exports_versions() -> None:
     scalar_result.__iter__.return_value = iter([version])
     list_session = session_with(recipe)
     list_session.scalars.return_value = scalar_result
-    versions = await list_recipe_versions(recipe.id, api_request(FakeApiDatabase(list_session)))
+    versions = await list_recipe_versions(
+        recipe.id, api_request(FakeApiDatabase(list_session)), TEST_USER
+    )
     assert [item.id for item in versions] == [version.id]
 
     exported = await export_recipe_version(
         version.id,
         api_request(FakeApiDatabase(session_with(version))),
+        TEST_USER,
         format="json",
     )
     assert exported.media_type == "application/json"
@@ -234,18 +258,22 @@ async def test_build_api_resolves_persists_reuses_and_reads_plans() -> None:
         version.id,
         api_request(FakeApiDatabase(session_with(version), session_with(None)), registry=registry),
         Response(),
+        TEST_USER,
     )
     assert planned.status == "planned"
     assert len(planned.build_identity) == 64
 
     build = BuildRun(
         id=uuid4(),
+        owner_id=TEST_USER.id,
         recipe_version_id=version.id,
         status=BuildStatus.PLANNED,
         build_identity="a" * 64,
         plan={"inputs": []},
     )
-    fetched = await get_build(build.id, api_request(FakeApiDatabase(session_with(build))))
+    fetched = await get_build(
+        build.id, api_request(FakeApiDatabase(session_with(build))), TEST_USER
+    )
     assert fetched.id == build.id
 
 
@@ -254,6 +282,7 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
     version, plan = version_and_plan()
     build = BuildRun(
         id=uuid4(),
+        owner_id=TEST_USER.id,
         recipe_version_id=version.id,
         status=BuildStatus.PLANNED,
         build_identity=plan.build_identity,
@@ -273,6 +302,7 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
             registry=registry,
             settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
         ),
+        TEST_USER,
         preview_limit=1,
     )
 
@@ -285,6 +315,7 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
     preview = await get_build_preview(
         build.id,
         api_request(FakeApiDatabase(session_with(build))),
+        TEST_USER,
     )
     assert preview.preview_row_count == 1
     assert preview.total_row_count == 2
@@ -294,15 +325,17 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
 async def test_recipe_api_returns_not_found_errors() -> None:
     missing_id = uuid4()
     with pytest.raises(HTTPException) as missing_recipe:
-        await get_recipe(missing_id, api_request(FakeApiDatabase(session_with(None))))
+        await get_recipe(missing_id, api_request(FakeApiDatabase(session_with(None))), TEST_USER)
     assert missing_recipe.value.status_code == 404
 
     with pytest.raises(HTTPException) as missing_version:
-        await get_recipe_version(missing_id, api_request(FakeApiDatabase(session_with(None))))
+        await get_recipe_version(
+            missing_id, api_request(FakeApiDatabase(session_with(None))), TEST_USER
+        )
     assert missing_version.value.status_code == 404
 
     with pytest.raises(HTTPException) as missing_build:
-        await get_build(missing_id, api_request(FakeApiDatabase(session_with(None))))
+        await get_build(missing_id, api_request(FakeApiDatabase(session_with(None))), TEST_USER)
     assert missing_build.value.status_code == 404
 
 
@@ -312,6 +345,7 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
 ) -> None:
     left = BuildRun(
         id=uuid4(),
+        owner_id=TEST_USER.id,
         recipe_version_id=uuid4(),
         status=BuildStatus.SUCCEEDED,
         build_identity="a" * 64,
@@ -320,6 +354,7 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
     )
     right = BuildRun(
         id=uuid4(),
+        owner_id=TEST_USER.id,
         recipe_version_id=uuid4(),
         status=BuildStatus.SUCCEEDED,
         build_identity="d" * 64,
@@ -353,12 +388,15 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
     validation_rows = MagicMock()
     validation_rows.__iter__.return_value = iter([validation])
     validation_session.scalars.return_value = validation_rows
-    issues = await get_build_validation(left.id, api_request(FakeApiDatabase(validation_session)))
+    issues = await get_build_validation(
+        left.id, api_request(FakeApiDatabase(validation_session)), TEST_USER
+    )
     assert issues[0].code == "validation_passed"
 
     lineage_response = await get_build_lineage(
         left.id,
         api_request(FakeApiDatabase(session_with(left, lineage))),
+        TEST_USER,
     )
     assert lineage_response == {"columns": []}
 
@@ -366,7 +404,9 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
     export_rows = MagicMock()
     export_rows.__iter__.return_value = iter([export])
     export_session.scalars.return_value = export_rows
-    exports = await get_build_exports(left.id, api_request(FakeApiDatabase(export_session)))
+    exports = await get_build_exports(
+        left.id, api_request(FakeApiDatabase(export_session)), TEST_USER
+    )
     assert exports[0].sha256 == export.sha256
 
     response = await download_export(
@@ -375,6 +415,7 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
             FakeApiDatabase(session_with(export)),
             settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
         ),
+        TEST_USER,
     )
     assert response.filename == "data.csv"
 
@@ -382,5 +423,6 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
         left.id,
         right.id,
         api_request(FakeApiDatabase(session_with(left, right))),
+        TEST_USER,
     )
     assert comparison["same_dataset"] is True

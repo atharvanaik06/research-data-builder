@@ -23,6 +23,8 @@ from research_data_builder.db.models import (
     RecipeVariable,
     RecipeVersion,
     TransformationStep,
+    User,
+    UserSession,
 )
 from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
@@ -93,6 +95,8 @@ async def clear_recipes(database: Database) -> None:
             RecipeVariable,
             RecipeVersion,
             DatasetRecipe,
+            UserSession,
+            User,
         ):
             await session.execute(delete(model))
 
@@ -116,9 +120,17 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
 
         try:
             async with database.session() as session, session.begin():
+                owner = User(
+                    email="recipe-owner@example.com",
+                    password_hash="test-only",
+                    is_active=True,
+                )
+                session.add(owner)
+                await session.flush()
+                owner_id = owner.id
                 recipes = RecipeRepository(session)
                 versions = RecipeVersionRepository(session)
-                recipe = await recipes.create(definition)
+                recipe = await recipes.create(owner_id, definition)
                 frozen = await versions.freeze(recipe, definition)
                 duplicate = await versions.freeze(recipe, definition)
                 assert frozen.created is True
@@ -128,14 +140,14 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                 recipe_id = recipe.id
 
             async with database.session() as session:
-                version = await RecipeVersionRepository(session).get(version_id)
+                version = await RecipeVersionRepository(session).get(version_id, owner_id)
                 assert version is not None
 
             plan = await planner.plan(version)
             async with database.session() as session, session.begin():
                 builds = BuildRepository(session)
-                first = await builds.create_or_get(version_id, plan)
-                second = await builds.create_or_get(version_id, plan)
+                first = await builds.create_or_get(owner_id, version_id, plan)
+                second = await builds.create_or_get(owner_id, version_id, plan)
                 assert first.created is True
                 assert second.created is False
                 assert second.build.id == first.build.id
@@ -157,7 +169,7 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                     application_version="0.1.0",
                 )
                 async with database.session() as session, session.begin():
-                    stored_build = await BuildRepository(session).get(build_id)
+                    stored_build = await BuildRepository(session).get(build_id, owner_id)
                     assert stored_build is not None
                     await BuildRepository(session).record_execution(
                         stored_build,
@@ -171,14 +183,14 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                     )
 
             async with database.session() as session:
-                stored_build = await BuildRepository(session).get(build_id)
+                stored_build = await BuildRepository(session).get(build_id, owner_id)
                 assert stored_build is not None
                 assert stored_build.row_count == 2
                 assert stored_build.status.value == "succeeded"
                 assert stored_build.dataset_checksum is not None
                 assert stored_build.preview is not None
                 assert stored_build.preview["preview_row_count"] == 2
-                exports = await BuildOutputRepository(session).list_exports(build_id)
+                exports = await BuildOutputRepository(session).list_exports(build_id, owner_id)
                 assert {export.name for export in exports} >= {
                     "data.csv",
                     "data.parquet",
@@ -187,15 +199,103 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
 
             changed = definition.model_copy(update={"name": "Changed draft"})
             async with database.session() as session, session.begin():
-                stored_recipe = await RecipeRepository(session).get(recipe_id)
+                stored_recipe = await RecipeRepository(session).get(recipe_id, owner_id)
                 assert stored_recipe is not None
                 await RecipeRepository(session).update(stored_recipe, changed)
 
             async with database.session() as session:
-                version = await RecipeVersionRepository(session).get(version_id)
+                version = await RecipeVersionRepository(session).get(version_id, owner_id)
                 assert version is not None
                 assert version.content["name"] == "European macro panel"
         finally:
+            await clear_recipes(database)
+            await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_postgres_isolates_research_resources_between_users() -> None:
+    async def scenario() -> None:
+        assert TEST_DATABASE_URL is not None
+        database = Database(TEST_DATABASE_URL)
+        await clear_recipes(database)
+        definition = RecipeDefinition.model_validate(valid_recipe())
+        registry = ProviderRegistry([cast(ProviderConnector, FixtureConnector())])
+        planner = BuildPlanner(registry)
+
+        try:
+            async with database.session() as session, session.begin():
+                first_user = User(
+                    email="first-owner@example.com",
+                    password_hash="test-only",
+                    is_active=True,
+                )
+                second_user = User(
+                    email="second-owner@example.com",
+                    password_hash="test-only",
+                    is_active=True,
+                )
+                session.add_all([first_user, second_user])
+                await session.flush()
+                first_user_id = first_user.id
+                second_user_id = second_user.id
+
+                recipes = RecipeRepository(session)
+                versions = RecipeVersionRepository(session)
+                first_recipe = await recipes.create(first_user_id, definition)
+                second_recipe = await recipes.create(second_user_id, definition)
+                first_version = (await versions.freeze(first_recipe, definition)).version
+                second_version = (await versions.freeze(second_recipe, definition)).version
+                first_recipe_id = first_recipe.id
+                second_recipe_id = second_recipe.id
+                first_version_id = first_version.id
+                second_version_id = second_version.id
+
+            first_plan = await planner.plan(first_version)
+            second_plan = await planner.plan(second_version)
+            assert first_plan.build_identity == second_plan.build_identity
+
+            async with database.session() as session, session.begin():
+                builds = BuildRepository(session)
+                first_build = (
+                    await builds.create_or_get(first_user_id, first_version_id, first_plan)
+                ).build
+                second_build = (
+                    await builds.create_or_get(second_user_id, second_version_id, second_plan)
+                ).build
+                first_build_id = first_build.id
+                second_build_id = second_build.id
+                second_export = ExportArtifact(
+                    build_run_id=second_build_id,
+                    name="private.csv",
+                    kind="csv",
+                    relative_path=f"builds/{second_build_id}/private.csv",
+                    size_bytes=1,
+                    sha256="a" * 64,
+                )
+                session.add(second_export)
+                await session.flush()
+                second_export_id = second_export.id
+
+            assert first_build_id != second_build_id
+            async with database.session() as session:
+                recipes = RecipeRepository(session)
+                versions = RecipeVersionRepository(session)
+                builds = BuildRepository(session)
+                outputs = BuildOutputRepository(session)
+
+                assert [item.id for item in await recipes.list(first_user_id)] == [first_recipe_id]
+                assert await recipes.get(second_recipe_id, first_user_id) is None
+                assert await versions.get(second_version_id, first_user_id) is None
+                assert await builds.get(second_build_id, first_user_id) is None
+                assert await outputs.get_export(second_export_id, first_user_id) is None
+
+                assert await recipes.get(second_recipe_id, second_user_id) is not None
+                assert await versions.get(second_version_id, second_user_id) is not None
+                assert await builds.get(second_build_id, second_user_id) is not None
+                assert await outputs.get_export(second_export_id, second_user_id) is not None
+        finally:
+            await clear_recipes(database)
             await database.dispose()
 
     asyncio.run(scenario())

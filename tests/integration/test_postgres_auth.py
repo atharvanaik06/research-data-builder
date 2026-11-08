@@ -25,8 +25,12 @@ def test_postgres_stores_hashed_credentials_and_revokes_sessions() -> None:
         database = Database(TEST_DATABASE_URL)
         try:
             async with database.session() as session, session.begin():
-                await session.execute(delete(UserSession))
-                await session.execute(delete(User))
+                existing = await AuthRepository(session).get_user_by_email("researcher@example.com")
+                if existing is not None:
+                    await session.execute(
+                        delete(UserSession).where(UserSession.user_id == existing.id)
+                    )
+                    await session.execute(delete(User).where(User.id == existing.id))
 
             async with database.session() as session, session.begin():
                 result = await AuthService(AuthRepository(session), session_ttl_hours=24).register(

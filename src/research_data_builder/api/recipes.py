@@ -4,14 +4,15 @@ import hashlib
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from research_data_builder.artifacts import export_research_bundle
+from research_data_builder.auth.dependencies import require_user
 from research_data_builder.core.config import Settings
 from research_data_builder.db.build_repositories import BuildRepository
-from research_data_builder.db.models import BuildRun, DatasetRecipe, RecipeVersion
+from research_data_builder.db.models import BuildRun, DatasetRecipe, RecipeVersion, User
 from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
 from research_data_builder.db.session import Database
@@ -27,6 +28,7 @@ from research_data_builder.recipes.service import RecipeNotFoundError, RecipeSer
 from research_data_builder.validation import validate_dataset
 
 router = APIRouter(prefix="/api/v1", tags=["recipes"])
+AuthenticatedUser = Annotated[User, Depends(require_user)]
 
 
 class RecipeResource(BaseModel):
@@ -117,10 +119,14 @@ def build_resource(build: BuildRun) -> BuildResource:
 
 
 @router.post("/recipes", response_model=RecipeResource, status_code=status.HTTP_201_CREATED)
-async def create_recipe(definition: RecipeDefinition, request: Request) -> RecipeResource:
+async def create_recipe(
+    definition: RecipeDefinition,
+    request: Request,
+    user: AuthenticatedUser,
+) -> RecipeResource:
     database: Database = request.app.state.database
     async with database.session() as session, session.begin():
-        recipe = await RecipeRepository(session).create(definition)
+        recipe = await RecipeRepository(session).create(user.id, definition)
         return recipe_resource(recipe)
 
 
@@ -131,6 +137,7 @@ async def create_recipe(definition: RecipeDefinition, request: Request) -> Recip
 )
 async def import_recipe(
     request: Request,
+    user: AuthenticatedUser,
     document: Annotated[str, Body(media_type="text/plain")],
     format: Annotated[Literal["json", "yaml"], Query()] = "yaml",
 ) -> RecipeResource:
@@ -142,22 +149,22 @@ async def import_recipe(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
-    return await create_recipe(definition, request)
+    return await create_recipe(definition, request, user)
 
 
 @router.get("/recipes", response_model=list[RecipeResource])
-async def list_recipes(request: Request) -> list[RecipeResource]:
+async def list_recipes(request: Request, user: AuthenticatedUser) -> list[RecipeResource]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        recipes = await RecipeRepository(session).list()
+        recipes = await RecipeRepository(session).list(user.id)
         return [recipe_resource(recipe) for recipe in recipes]
 
 
 @router.get("/recipes/{recipe_id}", response_model=RecipeResource)
-async def get_recipe(recipe_id: UUID, request: Request) -> RecipeResource:
+async def get_recipe(recipe_id: UUID, request: Request, user: AuthenticatedUser) -> RecipeResource:
     database: Database = request.app.state.database
     async with database.session() as session:
-        recipe = await RecipeRepository(session).get(recipe_id)
+        recipe = await RecipeRepository(session).get(recipe_id, user.id)
         if recipe is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recipe not found")
         return recipe_resource(recipe)
@@ -168,10 +175,13 @@ async def update_recipe(
     recipe_id: UUID,
     definition: RecipeDefinition,
     request: Request,
+    user: AuthenticatedUser,
 ) -> RecipeResource:
     database: Database = request.app.state.database
     async with database.session() as session, session.begin():
-        service = RecipeService(RecipeRepository(session), RecipeVersionRepository(session))
+        service = RecipeService(
+            RecipeRepository(session), RecipeVersionRepository(session), user.id
+        )
         try:
             recipe = await service.update(recipe_id, definition)
         except RecipeNotFoundError as error:
@@ -188,10 +198,13 @@ async def freeze_recipe(
     recipe_id: UUID,
     request: Request,
     response: Response,
+    user: AuthenticatedUser,
 ) -> RecipeVersionResource:
     database: Database = request.app.state.database
     async with database.session() as session, session.begin():
-        service = RecipeService(RecipeRepository(session), RecipeVersionRepository(session))
+        service = RecipeService(
+            RecipeRepository(session), RecipeVersionRepository(session), user.id
+        )
         try:
             result = await service.freeze(recipe_id)
         except RecipeNotFoundError as error:
@@ -202,23 +215,29 @@ async def freeze_recipe(
 
 
 @router.get("/recipe-versions/{version_id}", response_model=RecipeVersionResource)
-async def get_recipe_version(version_id: UUID, request: Request) -> RecipeVersionResource:
+async def get_recipe_version(
+    version_id: UUID, request: Request, user: AuthenticatedUser
+) -> RecipeVersionResource:
     database: Database = request.app.state.database
     async with database.session() as session:
-        version = await RecipeVersionRepository(session).get(version_id)
+        version = await RecipeVersionRepository(session).get(version_id, user.id)
         if version is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="version not found")
         return version_resource(version)
 
 
 @router.get("/recipes/{recipe_id}/versions", response_model=list[RecipeVersionResource])
-async def list_recipe_versions(recipe_id: UUID, request: Request) -> list[RecipeVersionResource]:
+async def list_recipe_versions(
+    recipe_id: UUID,
+    request: Request,
+    user: AuthenticatedUser,
+) -> list[RecipeVersionResource]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        recipe = await RecipeRepository(session).get(recipe_id)
+        recipe = await RecipeRepository(session).get(recipe_id, user.id)
         if recipe is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recipe not found")
-        versions = await RecipeVersionRepository(session).list_for_recipe(recipe_id)
+        versions = await RecipeVersionRepository(session).list_for_recipe(recipe_id, user.id)
         return [version_resource(version) for version in versions]
 
 
@@ -226,11 +245,12 @@ async def list_recipe_versions(recipe_id: UUID, request: Request) -> list[Recipe
 async def export_recipe_version(
     version_id: UUID,
     request: Request,
+    user: AuthenticatedUser,
     format: Annotated[Literal["json", "yaml"], Query()] = "yaml",
 ) -> Response:
     database: Database = request.app.state.database
     async with database.session() as session:
-        version = await RecipeVersionRepository(session).get(version_id)
+        version = await RecipeVersionRepository(session).get(version_id, user.id)
         if version is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="version not found")
         definition = RecipeDefinition.model_validate(version.content)
@@ -248,12 +268,13 @@ async def plan_build(
     version_id: UUID,
     request: Request,
     response: Response,
+    user: AuthenticatedUser,
 ) -> BuildResource:
     database: Database = request.app.state.database
     registry: ProviderRegistry = request.app.state.provider_registry
 
     async with database.session() as session:
-        version = await RecipeVersionRepository(session).get(version_id)
+        version = await RecipeVersionRepository(session).get(version_id, user.id)
     if version is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="version not found")
 
@@ -271,17 +292,17 @@ async def plan_build(
         ) from error
 
     async with database.session() as session, session.begin():
-        result = await BuildRepository(session).create_or_get(version.id, plan)
+        result = await BuildRepository(session).create_or_get(user.id, version.id, plan)
         if not result.created:
             response.status_code = status.HTTP_200_OK
         return build_resource(result.build)
 
 
 @router.get("/builds/{build_id}", response_model=BuildResource)
-async def get_build(build_id: UUID, request: Request) -> BuildResource:
+async def get_build(build_id: UUID, request: Request, user: AuthenticatedUser) -> BuildResource:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         return build_resource(build)
@@ -291,22 +312,23 @@ async def get_build(build_id: UUID, request: Request) -> BuildResource:
 async def execute_build(
     build_id: UUID,
     request: Request,
+    user: AuthenticatedUser,
     preview_limit: Annotated[int, Query(ge=1, le=1_000)] = 100,
 ) -> BuildResource:
     database: Database = request.app.state.database
     registry: ProviderRegistry = request.app.state.provider_registry
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        version = await RecipeVersionRepository(session).get(build.recipe_version_id)
+        version = await RecipeVersionRepository(session).get(build.recipe_version_id, user.id)
         if version is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="version is unavailable"
             )
 
     async with database.session() as session, session.begin():
-        active_build = await BuildRepository(session).get(build_id)
+        active_build = await BuildRepository(session).get(build_id, user.id)
         if active_build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         await BuildRepository(session).mark_retrieving(active_build)
@@ -316,7 +338,7 @@ async def execute_build(
         result = await BuildExecutor(registry).execute(version, plan)
     except (ProviderError, HarmonizationError, ValueError) as error:
         async with database.session() as session, session.begin():
-            failed_build = await BuildRepository(session).get(build_id)
+            failed_build = await BuildRepository(session).get(build_id, user.id)
             if failed_build is not None:
                 await BuildRepository(session).fail(
                     failed_build,
@@ -332,7 +354,7 @@ async def execute_build(
     validation = validate_dataset(result, recipe)
     if not validation.passed:
         async with database.session() as session, session.begin():
-            invalid_build = await BuildRepository(session).get(build_id)
+            invalid_build = await BuildRepository(session).get(build_id, user.id)
             if invalid_build is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
             await BuildRepository(session).record_execution(
@@ -363,7 +385,7 @@ async def execute_build(
         )
     except (OSError, ValueError) as error:
         async with database.session() as session, session.begin():
-            failed_build = await BuildRepository(session).get(build_id)
+            failed_build = await BuildRepository(session).get(build_id, user.id)
             if failed_build is not None:
                 await BuildRepository(session).fail(
                     failed_build,
@@ -376,7 +398,7 @@ async def execute_build(
         ) from error
 
     async with database.session() as session, session.begin():
-        completed_build = await BuildRepository(session).get(build_id)
+        completed_build = await BuildRepository(session).get(build_id, user.id)
         if completed_build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         await BuildRepository(session).record_execution(
@@ -393,10 +415,12 @@ async def execute_build(
 
 
 @router.get("/builds/{build_id}/preview", response_model=BuildPreviewResource)
-async def get_build_preview(build_id: UUID, request: Request) -> BuildPreviewResource:
+async def get_build_preview(
+    build_id: UUID, request: Request, user: AuthenticatedUser
+) -> BuildPreviewResource:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         if build.preview is None:
@@ -414,13 +438,14 @@ async def get_build_preview(build_id: UUID, request: Request) -> BuildPreviewRes
 async def get_build_validation(
     build_id: UUID,
     request: Request,
+    user: AuthenticatedUser,
 ) -> list[ValidationIssueResource]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        rows = await BuildOutputRepository(session).list_validation(build_id)
+        rows = await BuildOutputRepository(session).list_validation(build_id, user.id)
         return [
             ValidationIssueResource(
                 code=row.code,
@@ -434,35 +459,41 @@ async def get_build_validation(
 
 
 @router.get("/builds/{build_id}/lineage")
-async def get_build_lineage(build_id: UUID, request: Request) -> dict[str, Any]:
+async def get_build_lineage(
+    build_id: UUID, request: Request, user: AuthenticatedUser
+) -> dict[str, Any]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        lineage = await BuildOutputRepository(session).get_lineage(build_id)
+        lineage = await BuildOutputRepository(session).get_lineage(build_id, user.id)
         if lineage is None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="lineage is not ready")
         return lineage.content
 
 
 @router.get("/builds/{build_id}/exports", response_model=list[ExportResource])
-async def get_build_exports(build_id: UUID, request: Request) -> list[ExportResource]:
+async def get_build_exports(
+    build_id: UUID, request: Request, user: AuthenticatedUser
+) -> list[ExportResource]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id)
+        build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        exports = await BuildOutputRepository(session).list_exports(build_id)
+        exports = await BuildOutputRepository(session).list_exports(build_id, user.id)
         return [ExportResource.model_validate(export, from_attributes=True) for export in exports]
 
 
 @router.get("/exports/{export_id}/download", response_class=FileResponse)
-async def download_export(export_id: UUID, request: Request) -> FileResponse:
+async def download_export(
+    export_id: UUID, request: Request, user: AuthenticatedUser
+) -> FileResponse:
     database: Database = request.app.state.database
     settings: Settings = request.app.state.settings
     async with database.session() as session:
-        export = await BuildOutputRepository(session).get_export(export_id)
+        export = await BuildOutputRepository(session).get_export(export_id, user.id)
         if export is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="export not found")
     root = settings.artifact_root.expanduser().resolve()
@@ -481,11 +512,12 @@ async def compare_build_resources(
     build_id: UUID,
     other_build_id: UUID,
     request: Request,
+    user: AuthenticatedUser,
 ) -> dict[str, Any]:
     database: Database = request.app.state.database
     async with database.session() as session:
-        left = await BuildRepository(session).get(build_id)
-        right = await BuildRepository(session).get(other_build_id)
+        left = await BuildRepository(session).get(build_id, user.id)
+        right = await BuildRepository(session).get(other_build_id, user.id)
         if left is None or right is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         return compare_builds(left, right)

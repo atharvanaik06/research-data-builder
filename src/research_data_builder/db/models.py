@@ -82,6 +82,8 @@ class User(Base):
     )
 
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user")
+    recipes: Mapped[list["DatasetRecipe"]] = relationship(back_populates="owner")
+    build_runs: Mapped[list["BuildRun"]] = relationship(back_populates="owner")
 
 
 class UserSession(Base):
@@ -291,6 +293,9 @@ class DatasetRecipe(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(String(1000))
     draft_content: Mapped[dict[str, Any]] = mapped_column(JSON)
@@ -301,6 +306,7 @@ class DatasetRecipe(Base):
     )
 
     versions: Mapped[list["RecipeVersion"]] = relationship(back_populates="recipe")
+    owner: Mapped[User] = relationship(back_populates="recipes")
 
 
 class RecipeVersion(Base):
@@ -381,12 +387,19 @@ class BuildRun(Base):
 
     __tablename__ = "build_runs"
     __table_args__ = (
-        UniqueConstraint("build_identity", name="uq_build_runs_identity"),
+        UniqueConstraint(
+            "recipe_version_id",
+            "build_identity",
+            name="uq_build_runs_version_identity",
+        ),
         CheckConstraint("length(build_identity) = 64", name="build_identity_length"),
         CheckConstraint("row_count IS NULL OR row_count >= 0", name="build_row_count_nonnegative"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     recipe_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("recipe_versions.id", ondelete="RESTRICT"), nullable=False
     )
@@ -414,6 +427,7 @@ class BuildRun(Base):
     error_message: Mapped[str | None] = mapped_column(String(512))
 
     recipe_version: Mapped[RecipeVersion] = relationship(back_populates="build_runs")
+    owner: Mapped[User] = relationship(back_populates="build_runs")
     inputs: Mapped[list["BuildInput"]] = relationship(back_populates="build_run")
     validation_results: Mapped[list["DatasetValidationResult"]] = relationship(
         back_populates="build_run"

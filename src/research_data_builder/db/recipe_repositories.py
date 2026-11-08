@@ -30,8 +30,9 @@ class RecipeRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create(self, definition: RecipeDefinition) -> DatasetRecipe:
+    async def create(self, owner_id: UUID, definition: RecipeDefinition) -> DatasetRecipe:
         recipe = DatasetRecipe(
+            owner_id=owner_id,
             name=definition.name,
             description=definition.description,
             draft_content=definition.model_dump(mode="json"),
@@ -41,12 +42,20 @@ class RecipeRepository:
         await self.session.flush()
         return recipe
 
-    async def get(self, recipe_id: UUID) -> DatasetRecipe | None:
-        return await self.session.scalar(select(DatasetRecipe).where(DatasetRecipe.id == recipe_id))
+    async def get(self, recipe_id: UUID, owner_id: UUID) -> DatasetRecipe | None:
+        return await self.session.scalar(
+            select(DatasetRecipe).where(
+                DatasetRecipe.id == recipe_id,
+                DatasetRecipe.owner_id == owner_id,
+            )
+        )
 
-    async def list(self, *, limit: int = 100) -> list[DatasetRecipe]:
+    async def list(self, owner_id: UUID, *, limit: int = 100) -> list[DatasetRecipe]:
         result = await self.session.scalars(
-            select(DatasetRecipe).order_by(DatasetRecipe.created_at, DatasetRecipe.id).limit(limit)
+            select(DatasetRecipe)
+            .where(DatasetRecipe.owner_id == owner_id)
+            .order_by(DatasetRecipe.created_at, DatasetRecipe.id)
+            .limit(limit)
         )
         return list(result)
 
@@ -121,15 +130,24 @@ class RecipeVersionRepository:
         await self.session.flush()
         return FrozenRecipeResult(version=version, created=True)
 
-    async def get(self, version_id: UUID) -> RecipeVersion | None:
+    async def get(self, version_id: UUID, owner_id: UUID) -> RecipeVersion | None:
         return await self.session.scalar(
-            select(RecipeVersion).where(RecipeVersion.id == version_id)
+            select(RecipeVersion)
+            .join(DatasetRecipe, DatasetRecipe.id == RecipeVersion.recipe_id)
+            .where(
+                RecipeVersion.id == version_id,
+                DatasetRecipe.owner_id == owner_id,
+            )
         )
 
-    async def list_for_recipe(self, recipe_id: UUID) -> list[RecipeVersion]:
+    async def list_for_recipe(self, recipe_id: UUID, owner_id: UUID) -> list[RecipeVersion]:
         result = await self.session.scalars(
             select(RecipeVersion)
-            .where(RecipeVersion.recipe_id == recipe_id)
+            .join(DatasetRecipe, DatasetRecipe.id == RecipeVersion.recipe_id)
+            .where(
+                RecipeVersion.recipe_id == recipe_id,
+                DatasetRecipe.owner_id == owner_id,
+            )
             .order_by(RecipeVersion.version_number)
         )
         return list(result)

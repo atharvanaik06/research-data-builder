@@ -103,28 +103,38 @@ class BuildOutputRepository:
                 )
             )
 
-    async def list_validation(self, build_id: UUID) -> list[DatasetValidationResult]:
+    async def list_validation(
+        self, build_id: UUID, owner_id: UUID
+    ) -> list[DatasetValidationResult]:
         rows = await self.session.scalars(
             select(DatasetValidationResult)
+            .join(BuildRun, BuildRun.id == DatasetValidationResult.build_run_id)
             .where(DatasetValidationResult.build_run_id == build_id)
+            .where(BuildRun.owner_id == owner_id)
             .order_by(DatasetValidationResult.created_at, DatasetValidationResult.id)
         )
         return list(rows)
 
-    async def get_lineage(self, build_id: UUID) -> BuildLineage | None:
+    async def get_lineage(self, build_id: UUID, owner_id: UUID) -> BuildLineage | None:
         return await self.session.scalar(
-            select(BuildLineage).where(BuildLineage.build_run_id == build_id)
+            select(BuildLineage)
+            .join(BuildRun, BuildRun.id == BuildLineage.build_run_id)
+            .where(BuildLineage.build_run_id == build_id, BuildRun.owner_id == owner_id)
         )
 
-    async def list_exports(self, build_id: UUID) -> list[ExportArtifact]:
+    async def list_exports(self, build_id: UUID, owner_id: UUID) -> list[ExportArtifact]:
         rows = await self.session.scalars(
             select(ExportArtifact)
+            .join(BuildRun, BuildRun.id == ExportArtifact.build_run_id)
             .where(ExportArtifact.build_run_id == build_id)
+            .where(BuildRun.owner_id == owner_id)
             .order_by(ExportArtifact.name)
         )
         return list(rows)
 
-    async def get_export(self, export_id: UUID) -> ExportArtifact | None:
+    async def get_export(self, export_id: UUID, owner_id: UUID) -> ExportArtifact | None:
         return await self.session.scalar(
-            select(ExportArtifact).where(ExportArtifact.id == export_id)
+            select(ExportArtifact)
+            .join(BuildRun, BuildRun.id == ExportArtifact.build_run_id)
+            .where(ExportArtifact.id == export_id, BuildRun.owner_id == owner_id)
         )

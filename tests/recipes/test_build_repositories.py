@@ -38,10 +38,13 @@ async def test_build_repository_persists_plan_and_resolved_inputs() -> None:
     session.scalar = AsyncMock(return_value=None)
     session.flush = AsyncMock()
     repository = BuildRepository(session)
+    owner_id = uuid4()
+    version_id = uuid4()
 
-    result = await repository.create_or_get(uuid4(), build_plan())
+    result = await repository.create_or_get(owner_id, version_id, build_plan())
 
     assert result.created is True
+    assert result.build.owner_id == owner_id
     assert result.build.status is BuildStatus.PLANNED
     added = [call.args[0] for call in session.add.call_args_list]
     inputs = [item for item in added if isinstance(item, BuildInput)]
@@ -56,7 +59,7 @@ async def test_build_repository_reuses_existing_identity() -> None:
     session.scalar = AsyncMock(return_value=existing)
     session.flush = AsyncMock()
 
-    result = await BuildRepository(session).create_or_get(uuid4(), build_plan())
+    result = await BuildRepository(session).create_or_get(uuid4(), uuid4(), build_plan())
 
     assert result.created is False
     assert result.build is existing
