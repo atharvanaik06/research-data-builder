@@ -262,8 +262,9 @@ Delivered so far:
 - Explicit failed-build retry as a new numbered build ID and artifact directory.
 - A durable PostgreSQL queue with one job for each build attempt.
 - A separate worker process with job claims, leases, heartbeats, and expired-lease failure handling.
+- Automatic numbered retries for temporary provider failures, with bounded delays.
 - Immediate `202 Accepted` responses and authenticated job progress queries.
-- Migrations `0005` through `0008` with PostgreSQL job coverage.
+- Migrations `0005` through `0009` with PostgreSQL job and retry coverage.
 
 Deliverables:
 

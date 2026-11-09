@@ -43,6 +43,16 @@ If the lease expires, the system marks the job and build as failed. The error co
 
 The system does not reuse the failed build record. The user creates a new numbered retry.
 
+## Automatic retries
+
+The worker retries temporary provider failures. These failures include network errors, rate limits, and provider server errors.
+
+Each retry creates a new numbered build and a new job. The worker keeps the failed build as history.
+
+The worker waits 5 seconds before attempt 2. It waits 10 seconds before attempt 3. The worker stops after attempt 3.
+
+The worker does not retry configuration errors, invalid provider responses, validation failures, or export failures.
+
 ## Local services
 
 Docker Compose starts these services:

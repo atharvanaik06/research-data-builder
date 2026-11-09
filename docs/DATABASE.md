@@ -112,7 +112,7 @@ The service records validation failures without exports. For successful builds i
 
 ## Implemented authentication and ownership schema
 
-Migrations `0005` through `0008` implement the current Phase 7 schema:
+Migrations `0005` through `0009` implement the current Phase 7 schema:
 
 ```text
 users
@@ -129,6 +129,8 @@ Every recipe and build has a non-null owner foreign key. Versions and output rec
 Migration `0007` adds a positive attempt number. The combination of recipe version, deterministic plan identity, and attempt number is unique. Attempt 1 is the initial execution; retrying a failed attempt creates attempt 2 or later as a new row with a new artifact directory. Successful and failed rows are terminal, preserving their status, outputs, checksum, validation, and lineage.
 
 Migration `0008` adds one durable job for each build attempt. A worker owns a running job for a limited lease period. The worker updates a heartbeat while it works. An expired lease marks the job and build as failed. The user can then create a new numbered retry.
+
+Migration `0009` permits three attempts for temporary provider failures. Each retry uses a new build row and job row.
 
 ## Existing invariants
 

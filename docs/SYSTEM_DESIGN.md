@@ -101,6 +101,7 @@ Metadata for a generated artifact: format, location, schema, row count, size, co
 11. **Export service** — writes data and documentation artifacts.
 12. **Repository layer** — stores transactional metadata, source versions, builds, and artifact references.
 13. **Background worker** — executes queued builds outside API request processes.
+14. **Retry policy** — retries temporary provider failures as new numbered build attempts.
 
 ### 2.3 Storage responsibilities
 
