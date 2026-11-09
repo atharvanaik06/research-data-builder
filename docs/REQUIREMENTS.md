@@ -67,13 +67,16 @@ One deterministic build produces data, documentation, validation, provenance, an
 1. As a researcher, I can search supported provider indicators.
 2. As a researcher, I can select variables, entities, and a time range.
 3. As a researcher, I can inspect source units, frequencies, and descriptions before building.
-4. As a researcher, I can save a versioned dataset recipe.
+4. As a researcher, I can save a versioned dataset recipe in my private account.
 5. As a researcher, I can build the recipe using deterministic transformations.
 6. As a researcher, I can preview the joined research table.
 7. As a researcher, I can see missing coverage and validation warnings.
 8. As a researcher, I can export CSV and Parquet data.
 9. As a researcher, I receive a codebook, source manifest, citations, and checksum.
 10. As a collaborator, I can rebuild the same recipe and verify whether its inputs changed.
+11. As a researcher, I can run the workflow from a browser.
+12. As a researcher, I can view job progress, cancel work, and retry a failed build.
+13. As a researcher, I can view my recent activity.
 
 ## 5. Functional requirements
 
@@ -168,9 +171,9 @@ One deterministic build produces data, documentation, validation, provenance, an
 
 ### FR-12: Authentication and collaboration
 
-- Authentication is not required for the earliest local MVP.
-- It is required before public multi-user deployment.
+- Users must sign in before they access recipes, builds, activity, or exports.
 - Users may access only their own private recipes, builds, credentials, and exports.
+- The system must enforce bounded recipe sizes and outstanding build counts.
 - A later collaboration model may support shared read or build permissions.
 
 ### FR-13: AI assistance

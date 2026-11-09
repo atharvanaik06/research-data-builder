@@ -11,7 +11,7 @@ PostgreSQL is the system of record for research workflow state:
 - transformations and validation results;
 - source-to-output lineage;
 - export locations, schemas, and checksums;
-- users and ownership in later phases.
+- users, ownership, jobs, cache records, and audit history.
 
 Large raw responses and generated CSV/Parquet/report files belong in local artifact storage for the MVP and object storage in production. Polars or DuckDB performs analytical transformations. PostgreSQL records what happened and keeps relationships consistent.
 
@@ -112,14 +112,17 @@ The service records validation failures without exports. For successful builds i
 
 ## Implemented authentication and ownership schema
 
-Migrations `0005` through `0009` implement the current Phase 7 schema:
+Migrations `0005` through `0012` implement the Phase 7 schema:
 
 ```text
 users
 ├── user_sessions
+├── audit_events
 ├── dataset_recipes
 └── build_runs
-    └── build_jobs
+    ├── build_jobs
+    └── build_inputs
+        └── provider_input_cache
 ```
 
 `users` stores normalized unique email addresses, salted password hashes, and account state. `user_sessions` stores only a hash of each opaque browser token, plus expiry, revocation, and last-use timestamps. Deleting a user cascades to their sessions.
@@ -131,6 +134,12 @@ Migration `0007` adds a positive attempt number. The combination of recipe versi
 Migration `0008` adds one durable job for each build attempt. A worker owns a running job for a limited lease period. The worker updates a heartbeat while it works. An expired lease marks the job and build as failed. The user can then create a new numbered retry.
 
 Migration `0009` permits three attempts for temporary provider failures. Each retry uses a new build row and job row.
+
+Migration `0010` adds job cancellation. A queued job can stop immediately. A running job records a cancellation request. The worker checks that request between major build steps.
+
+Migration `0011` adds immutable provider-input cache entries. Each entry stores the normalized response, request identity, response fingerprint, retrieval time, expiry time, and reuse count. Each build input records the exact cache entry and whether the worker used a hit, miss, or forced refresh.
+
+Migration `0012` adds private audit events. Each event records the user, action, resource type, resource ID, safe details, and time. The audit log covers recipe changes, build actions, worker results, and downloads.
 
 ## Existing invariants
 

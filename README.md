@@ -1,6 +1,6 @@
 # Research Data Builder
 
-[![CI](https://github.com/atharvanaik06/economic-release-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/atharvanaik06/economic-release-tracker/actions/workflows/ci.yml)
+[![CI](https://github.com/atharvanaik06/research-data-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/atharvanaik06/research-data-builder/actions/workflows/ci.yml)
 
 Research Data Builder turns public economic APIs into validated, documented, and reproducible research datasets.
 
@@ -47,13 +47,13 @@ The local MVP will support:
 - exact input and transformation lineage;
 - fixture-driven tests that do not depend on live provider availability.
 
-Browser interfaces, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
+Cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
 
-Phase 7 is in progress. The product includes secure accounts, private research ownership, immutable builds, a PostgreSQL background queue, and build cancellation.
+Phase 7 is complete. The product includes secure accounts, private research ownership, immutable builds, a PostgreSQL background queue, cached provider inputs, activity history, user limits, and a browser interface.
 
 ## Current product
 
-Phases 1 through 6 are complete. A frozen recipe can now run through the entire local workflow:
+Phases 1 through 7 are complete. A researcher can now use the full local workflow from a browser:
 
 - FastAPI application, validated settings, and structured logging;
 - Docker and PostgreSQL local stack;
@@ -84,9 +84,15 @@ Phases 1 through 6 are complete. A frozen recipe can now run through the entire 
 - deterministic CSV and Parquet export with codebook, citations, manifest, and reports;
 - checksum-verified artifact downloads and build-to-build comparisons;
 - transactional validation, lineage, export metadata, and final build success;
+- secure account sessions and private ownership checks;
+- durable background jobs with progress, retries, and cancellation;
+- a 24-hour provider-input cache with an explicit refresh option;
+- per-user recipe and outstanding-build limits;
+- a private activity history for recipe, build, worker, and download events;
+- a guided browser workflow for recipes, builds, previews, validation, and downloads;
 - PostgreSQL integration tests for decimal precision, constraints, ordering, and rollback.
 
-See the checked-in [sample research bundle](examples/sample_bundle/README.md) without running the application. The browser workflow remains a later Phase 7 task.
+See the checked-in [sample research bundle](examples/sample_bundle/README.md) without running the application.
 
 ## Quick start
 
@@ -101,6 +107,7 @@ cp .env.example .env
 
 Then open:
 
+- Browser application: <http://localhost:8000/app>
 - API health: <http://localhost:8000/health>
 - Dependency readiness: <http://localhost:8000/ready>
 - Interactive API documentation: <http://localhost:8000/docs>
@@ -140,9 +147,12 @@ docker compose up --build
 - [Validation and research bundles](docs/BUNDLES.md)
 - [Authentication and browser sessions](docs/AUTHENTICATION.md)
 - [Background build jobs](docs/BACKGROUND_JOBS.md)
+- [Provider-input cache](docs/PROVIDER_CACHE.md)
+- [Browser workflow](docs/WEB_APP.md)
+- [Audit history and user limits](docs/AUDIT_AND_LIMITS.md)
 - [Adversarial review findings and engineering backlog](docs/REVIEW_FINDINGS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 
 ## Current status
 
-The complete local research-data MVP is implemented through Phase 6. Phase 7 adds authenticated workspaces, immutable attempts, and background workers. The browser interface remains incomplete.
+The complete hosted-workflow foundation is implemented through Phase 7. Phase 8 will deploy the API, worker, PostgreSQL database, queue, and artifact storage on AWS.

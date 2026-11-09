@@ -17,7 +17,10 @@ The system must:
 9. Export CSV, Parquet, a codebook, manifest, citations, and validation report.
 10. Record source-to-output lineage and deterministic checksums.
 11. Rebuild a recipe and explain upstream or output changes.
-12. Authenticate users and enforce ownership before public deployment.
+12. Authenticate users and enforce ownership for all private research data.
+13. Queue long builds and report progress without holding an API request open.
+14. Reuse valid provider inputs unless the researcher requests fresh data.
+15. Record private activity history and enforce per-user limits.
 
 ### 1.2 Non-functional requirements
 
@@ -74,6 +77,14 @@ One execution of one recipe version. It records state, deterministic identity, s
 
 Links a build to the exact provider retrievals or observation versions used. This is the core provenance record.
 
+#### Provider input cache
+
+Stores one immutable normalized provider response. It includes the request identity, response fingerprint, retrieval time, expiry time, and reuse count. A build input points to the exact cache entry that it used.
+
+#### Audit event
+
+Records a user or worker action for one private account. It includes the action, resource, safe details, and time.
+
 #### Transformation step
 
 One ordered deterministic operation with type, parameters, input columns, output columns, and engine version.
@@ -102,6 +113,9 @@ Metadata for a generated artifact: format, location, schema, row count, size, co
 12. **Repository layer** — stores transactional metadata, source versions, builds, and artifact references.
 13. **Background worker** — executes queued builds outside API request processes.
 14. **Retry policy** — retries temporary provider failures as new numbered build attempts.
+15. **Browser application** — guides account, recipe, build, preview, validation, and download work.
+16. **Provider cache** — reuses recent normalized inputs and records the exact entry for each build.
+17. **Audit service** — records private user and worker actions.
 
 ### 2.3 Storage responsibilities
 
@@ -167,7 +181,15 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 | `GET /api/v1/exports/{export_id}/download` | Download or redirect to an authorized artifact. |
 | `GET /api/v1/builds/{build_id}/comparison?other_build_id=...` | Explain recipe, input, and logical dataset changes between builds. |
 
-### 3.5 Example recipe
+### 3.5 Activity history
+
+| Method and route | Purpose |
+|---|---|
+| `GET /api/v1/audit-events` | Return recent private activity for the signed-in user. |
+
+Build creation accepts `refresh_provider_inputs=true` when the researcher needs fresh provider data instead of a valid cache entry.
+
+### 3.6 Example recipe
 
 ```json
 {
@@ -195,7 +217,7 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 }
 ```
 
-### 3.6 API behavior
+### 3.7 API behavior
 
 - Recipe validation returns structured field and semantic errors.
 - Freezing creates a new immutable version and never mutates older versions.
@@ -206,20 +228,25 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 
 ## 4: High-level design
 
-### 4.1 Local MVP architecture
+### 4.1 Phase 7 architecture
 
 ```mermaid
 flowchart LR
-    User[Researcher] --> API[FastAPI]
+    User[Researcher] --> UI[Browser application]
+    UI --> API[FastAPI]
     API --> DB[(PostgreSQL metadata and provenance)]
     API --> Planner[Recipe validator and build planner]
+    API --> Queue[(PostgreSQL job queue)]
+    Queue --> Worker[Build worker]
     Planner --> Registry[Provider connector registry]
+    Worker --> Cache[Provider-input cache]
+    Cache --> Registry
     Registry --> FRED[FRED API or fixtures]
     Registry --> WB[World Bank API or fixtures]
     FRED --> Normalize[Common observation schema]
     WB --> Normalize
     Normalize --> DB
-    Normalize --> Engine[Polars or DuckDB build engine]
+    Normalize --> Engine[Polars build engine]
     Engine --> Validate[Validation engine]
     Validate --> Export[CSV, Parquet, codebook, manifest]
     Export --> Files[(Local artifact directory)]
@@ -232,6 +259,8 @@ flowchart LR
 sequenceDiagram
     participant U as Researcher
     participant A as API
+    participant Q as Job queue
+    participant W as Worker
     participant P as Build planner
     participant C as Provider connectors
     participant E as Transformation engine
@@ -240,15 +269,19 @@ sequenceDiagram
 
     U->>A: Freeze recipe version
     A->>D: Store immutable recipe
-    U->>A: Start build
+    U->>A: Queue build
     A->>P: Plan inputs and deterministic identity
-    P->>C: Retrieve or reuse provider inputs
+    A->>Q: Store build job
+    A-->>U: Return 202 and job state
+    Q->>W: Claim job with lease
+    W->>C: Retrieve or reuse provider inputs
     C->>D: Record retrieval and source versions
-    P->>E: Execute normalized inputs and recipe
+    W->>E: Execute normalized inputs and recipe
     E->>E: Harmonize, transform, join, validate
     E->>F: Write data and documentation bundle
     E->>D: Commit lineage, validation, checksums, success
-    A-->>U: Build summary and export links
+    U->>A: Poll job state
+    A-->>U: Return progress and export links
 ```
 
 ### 4.3 Production evolution

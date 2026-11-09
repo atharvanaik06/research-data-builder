@@ -51,6 +51,7 @@ The Compose stack exposes:
 
 | Service | Address |
 |---|---|
+| Browser application | <http://localhost:8000/app> |
 | API | <http://localhost:8000> |
 | API documentation | <http://localhost:8000/docs> |
 | PostgreSQL | `localhost:5432` |
@@ -94,11 +95,14 @@ Settings use the `RESEARCH_DATA_` environment prefix.
 | `RESEARCH_DATA_FRED_API_KEY` | unset | Required for live FRED requests |
 | `RESEARCH_DATA_PROVIDER_HTTP_TIMEOUT_SECONDS` | `15` | Timeout for one provider request attempt |
 | `RESEARCH_DATA_PROVIDER_HTTP_MAX_ATTEMPTS` | `3` | Maximum attempts for transient provider failures |
+| `RESEARCH_DATA_PROVIDER_CACHE_TTL_HOURS` | `24` | Valid lifetime for a cached provider response |
 | `RESEARCH_DATA_ARTIFACT_ROOT` | `artifacts` | Controlled root for generated build bundles |
 | `RESEARCH_DATA_SESSION_COOKIE_NAME` | `research_data_session` | Opaque browser-session cookie name |
 | `RESEARCH_DATA_SESSION_TTL_HOURS` | `168` | Session lifetime in hours |
 | `RESEARCH_DATA_WORKER_POLL_SECONDS` | `1` | Delay between empty queue checks |
 | `RESEARCH_DATA_WORKER_LEASE_SECONDS` | `60` | Worker lease duration in seconds |
+| `RESEARCH_DATA_MAX_OUTSTANDING_BUILDS_PER_USER` | `5` | Maximum queued and running builds for one user |
+| `RESEARCH_DATA_MAX_RECIPE_BYTES` | `65536` | Maximum stored recipe size in bytes |
 
 Copy `.env.example` to `.env` for local overrides. `.env` is ignored by Git. Never commit provider keys, passwords, or private research credentials.
 
@@ -156,3 +160,5 @@ The current foundation is considered healthy when:
 8. PostgreSQL integration tests verify precision, uniqueness, ordering, and rollback.
 9. CI validates both Python quality checks and the container build.
 10. FRED and World Bank fixture contract tests pass without external network access.
+11. The browser application loads at `/app`.
+12. Cache, audit, ownership, limit, and job tests pass.

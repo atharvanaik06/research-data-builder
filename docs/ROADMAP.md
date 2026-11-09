@@ -244,7 +244,7 @@ recipe
 
 ## Phase 7: Add multi-user workflows and asynchronous builds
 
-**Status:** in progress.
+**Status:** complete.
 
 **Goal:** make long-running builds safe and usable as a hosted application.
 
@@ -265,7 +265,11 @@ Delivered so far:
 - Automatic numbered retries for temporary provider failures, with bounded delays.
 - Immediate `202 Accepted` responses and authenticated job progress queries.
 - Immediate cancellation for queued jobs and cooperative cancellation for running jobs.
-- Migrations `0005` through `0010` with PostgreSQL job, retry, and cancellation coverage.
+- An immutable provider-input cache with a 24-hour default policy and forced refresh.
+- A guided browser interface for accounts, recipes, builds, previews, validation, and exports.
+- Private audit history for user actions and worker outcomes.
+- Per-user recipe-size and outstanding-build limits.
+- Migrations `0005` through `0012` with PostgreSQL coverage.
 
 Deliverables:
 
@@ -273,11 +277,11 @@ Deliverables:
 - Immutable numbered build attempts and terminal-state enforcement. **Complete.**
 - Background build queue and workers. **Complete.**
 - Job progress and cancellation. **Complete.**
-- Idempotent job handling and terminal failure states.
-- Provider input cache and refresh policies.
-- Authorized artifact downloads.
-- Small browser interface for recipe creation, build status, preview, validation, and exports.
-- Audit history and per-user limits.
+- Idempotent job handling and terminal failure states. **Complete.**
+- Provider input cache and refresh policies. **Complete.**
+- Authorized artifact downloads. **Complete.**
+- Small browser interface for recipe creation, build status, preview, validation, and exports. **Complete.**
+- Audit history and per-user limits. **Complete.**
 
 Likely commits:
 
