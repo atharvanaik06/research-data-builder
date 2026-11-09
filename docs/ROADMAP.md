@@ -260,14 +260,17 @@ Delivered so far:
 - Atomic execution claims that prevent two requests from running the same attempt.
 - Terminal successful and failed builds that cannot be executed or overwritten again.
 - Explicit failed-build retry as a new numbered build ID and artifact directory.
-- Migrations `0005` through `0007` with PostgreSQL lifecycle, ownership, and attempt coverage.
+- A durable PostgreSQL queue with one job for each build attempt.
+- A separate worker process with job claims, leases, heartbeats, and expired-lease failure handling.
+- Immediate `202 Accepted` responses and authenticated job progress queries.
+- Migrations `0005` through `0008` with PostgreSQL job coverage.
 
 Deliverables:
 
 - Authentication and recipe/build ownership. **Complete.**
 - Immutable numbered build attempts and terminal-state enforcement. **Complete.**
-- Background build queue and workers.
-- Job progress and cancellation policy.
+- Background build queue and workers. **Complete.**
+- Job progress. **Complete.** Cancellation remains open.
 - Idempotent job handling and terminal failure states.
 - Provider input cache and refresh policies.
 - Authorized artifact downloads.

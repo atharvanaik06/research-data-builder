@@ -47,9 +47,9 @@ The local MVP will support:
 - exact input and transformation lineage;
 - fixture-driven tests that do not depend on live provider availability.
 
-Browser interfaces, background queues, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
+Browser interfaces, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
 
-Phase 7 is now in progress. Secure user accounts, revocable browser sessions, and private per-user research ownership are implemented; asynchronous builds are the next product slice.
+Phase 7 is in progress. The product includes secure accounts, private research ownership, immutable builds, and a PostgreSQL background queue.
 
 ## Current product
 
@@ -86,7 +86,7 @@ Phases 1 through 6 are complete. A frozen recipe can now run through the entire 
 - transactional validation, lineage, export metadata, and final build success;
 - PostgreSQL integration tests for decimal precision, constraints, ordering, and rollback.
 
-See the checked-in [sample research bundle](examples/sample_bundle/README.md) without running the application. The next phase adds accounts, background workers, and a small browser workflow; those are not required to inspect or demonstrate the local MVP.
+See the checked-in [sample research bundle](examples/sample_bundle/README.md) without running the application. The browser workflow remains a later Phase 7 task.
 
 ## Quick start
 
@@ -138,9 +138,10 @@ docker compose up --build
 - [Transformation engine](docs/ENGINE.md)
 - [Validation and research bundles](docs/BUNDLES.md)
 - [Authentication and browser sessions](docs/AUTHENTICATION.md)
+- [Background build jobs](docs/BACKGROUND_JOBS.md)
 - [Adversarial review findings and engineering backlog](docs/REVIEW_FINDINGS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 
 ## Current status
 
-The complete local research-data MVP is implemented through Phase 6, and Phase 7 is in progress. The application now has authenticated private workspaces and immutable numbered build attempts. Long-running work is still synchronous; background workers and the browser interface are the next major product slices.
+The complete local research-data MVP is implemented through Phase 6. Phase 7 adds authenticated workspaces, immutable attempts, and background workers. The browser interface remains incomplete.

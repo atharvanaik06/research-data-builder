@@ -96,7 +96,8 @@ added while executing the plan in the next phases.
 | `GET /api/v1/recipe-versions/{id}/export` | Export JSON or YAML. |
 | `POST /api/v1/recipe-versions/{id}/builds` | Resolve or reuse a deterministic plan. |
 | `GET /api/v1/builds/{id}` | Inspect build status, identity, and resolved inputs. |
-| `POST /api/v1/builds/{id}/execute` | Retrieve, harmonize, transform, and join inputs. |
+| `POST /api/v1/builds/{id}/execute` | Queue the build and return its background job. |
+| `GET /api/v1/builds/{id}/job` | Read the job status and progress. |
 | `POST /api/v1/builds/{id}/retry` | Create a new numbered attempt from a failed build. |
 | `GET /api/v1/builds/{id}/preview` | Read the stored bounded table preview. |
 

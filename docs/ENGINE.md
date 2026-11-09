@@ -82,7 +82,7 @@ Column order follows recipe variable order, and rows sort by declared join keys.
 
 ## Preview boundary
 
-`POST /api/v1/builds/{id}/execute` runs the current synchronous local workflow. The stored preview
+`POST /api/v1/builds/{id}/execute` queues the workflow and returns `202 Accepted`. The worker runs the workflow. The stored preview
 contains at most 1,000 rows, JSON-safe ISO dates and decimal strings, the complete column list, full
 row count, and a truncation flag.
 

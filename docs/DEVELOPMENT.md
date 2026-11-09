@@ -29,7 +29,7 @@ Using `--app-dir src` ensures development runs always use the current source fil
 
 ## Docker setup
 
-Start the API and PostgreSQL:
+Start the API, worker, and PostgreSQL:
 
 ```bash
 docker compose up --build
@@ -54,6 +54,7 @@ The Compose stack exposes:
 | API | <http://localhost:8000> |
 | API documentation | <http://localhost:8000/docs> |
 | PostgreSQL | `localhost:5432` |
+| Worker | Background process in the Compose stack |
 
 The liveness route at `/health` does not query PostgreSQL. The readiness route at `/ready` returns `200` only when the database can execute a query.
 
@@ -96,6 +97,8 @@ Settings use the `RESEARCH_DATA_` environment prefix.
 | `RESEARCH_DATA_ARTIFACT_ROOT` | `artifacts` | Controlled root for generated build bundles |
 | `RESEARCH_DATA_SESSION_COOKIE_NAME` | `research_data_session` | Opaque browser-session cookie name |
 | `RESEARCH_DATA_SESSION_TTL_HOURS` | `168` | Session lifetime in hours |
+| `RESEARCH_DATA_WORKER_POLL_SECONDS` | `1` | Delay between empty queue checks |
+| `RESEARCH_DATA_WORKER_LEASE_SECONDS` | `60` | Worker lease duration in seconds |
 
 Copy `.env.example` to `.env` for local overrides. `.env` is ignored by Git. Never commit provider keys, passwords, or private research credentials.
 

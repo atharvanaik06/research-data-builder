@@ -100,7 +100,7 @@ Metadata for a generated artifact: format, location, schema, row count, size, co
 10. **Provenance service** — records source-to-output lineage and canonical checksums.
 11. **Export service** — writes data and documentation artifacts.
 12. **Repository layer** — stores transactional metadata, source versions, builds, and artifact references.
-13. **Background worker, later** — executes builds outside API request processes.
+13. **Background worker** — executes queued builds outside API request processes.
 
 ### 2.3 Storage responsibilities
 
@@ -110,7 +110,7 @@ Metadata for a generated artifact: format, location, schema, row count, size, co
 | Local files in MVP | Raw response fixtures and generated data/documentation bundles. |
 | S3 in production | Large raw responses, CSV/Parquet exports, codebooks, and reports. |
 | Polars/DuckDB | In-process or local analytical transformation and joins. |
-| Queue in later phases | Durable asynchronous build and retrieval work. |
+| PostgreSQL job queue | Durable asynchronous build work for the local product. |
 
 PostgreSQL is the system of record for what happened. Parquet and object storage hold large analytical artifacts.
 
@@ -156,7 +156,8 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 | `POST /api/v1/recipe-versions/{version_id}/builds` | Start or reuse a deterministic build. |
 | `GET /api/v1/builds/{build_id}` | Return state, timing, and summary. |
 | `GET /api/v1/builds/{build_id}/preview` | Return a bounded data preview. |
-| `POST /api/v1/builds/{build_id}/execute` | Retrieve inputs and execute the deterministic table plan. |
+| `POST /api/v1/builds/{build_id}/execute` | Queue a build and return `202 Accepted`. |
+| `GET /api/v1/builds/{build_id}/job` | Return queue status, progress, attempts, and errors. |
 | `POST /api/v1/builds/{build_id}/retry` | Create a new numbered attempt from a failed build. |
 | `GET /api/v1/builds/{build_id}/validation` | Return warnings, errors, and coverage. |
 | `GET /api/v1/builds/{build_id}/lineage` | Explain input and transformation lineage. |

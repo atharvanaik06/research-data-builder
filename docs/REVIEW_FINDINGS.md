@@ -190,9 +190,9 @@ Relevant code:
 
 Resolution checklist:
 
-- [ ] Put build execution behind a durable worker boundary.
+- [x] Put build execution behind a durable worker boundary.
 - [ ] Record terminal failure for unexpected exceptions without leaking internals.
-- [ ] Track worker heartbeat and attempt timestamps.
+- [x] Track worker heartbeat and attempt timestamps.
 - [ ] Recover or fail stale in-progress builds.
 - [ ] Add process-loss and unexpected-exception tests.
 
