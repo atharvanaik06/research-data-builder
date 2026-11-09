@@ -46,7 +46,7 @@ class BuildJobRepository:
             status=JobStatus.QUEUED,
             progress="queued",
             attempt_count=0,
-            max_attempts=1,
+            max_attempts=3,
             available_at=datetime.now(UTC),
         )
         self.session.add(job)

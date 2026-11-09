@@ -5,6 +5,7 @@ import logging
 import os
 import socket
 from contextlib import suppress
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -66,13 +67,7 @@ class BuildWorker:
         try:
             await self.executor.execute(build_id, owner_id, progress=progress)
         except BuildJobExecutionError as error:
-            async with self.database.session() as session, session.begin():
-                await BuildJobRepository(session).fail(
-                    job_id,
-                    self.worker_id,
-                    error_code=error.code,
-                    error_message=str(error),
-                )
+            await self._record_expected_failure(job_id, build_id, owner_id, error)
         except Exception as error:
             await self._record_unexpected_failure(job_id, build_id, owner_id, error)
             logger.exception("background build failed", extra={"job_id": str(job_id)})
@@ -83,6 +78,35 @@ class BuildWorker:
             stop_heartbeat.set()
             await heartbeat
         return True
+
+    async def _record_expected_failure(
+        self,
+        job_id: UUID,
+        build_id: UUID,
+        owner_id: UUID,
+        error: BuildJobExecutionError,
+    ) -> None:
+        async with self.database.session() as session, session.begin():
+            jobs = BuildJobRepository(session)
+            failed_job = await jobs.fail(
+                job_id,
+                self.worker_id,
+                error_code=error.code,
+                error_message=str(error),
+            )
+            if not error.retryable:
+                return
+            builds = BuildRepository(session)
+            failed_build = await builds.get(build_id, owner_id)
+            if failed_build is None or failed_build.status is not BuildStatus.FAILED:
+                return
+            if failed_build.attempt_number >= failed_job.max_attempts:
+                return
+            retry = await builds.create_retry(failed_build)
+            queued = await jobs.enqueue(retry)
+            queued.job.max_attempts = failed_job.max_attempts
+            delay = min(60, 5 * (2 ** (retry.attempt_number - 2)))
+            queued.job.available_at = datetime.now(UTC) + timedelta(seconds=delay)
 
     async def run_forever(self) -> None:
         while True:

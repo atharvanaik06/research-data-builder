@@ -126,3 +126,78 @@ async def test_worker_records_expected_build_failure() -> None:
     assert await worker.run_once() is True
     assert job.status is JobStatus.FAILED
     assert job.error_code == "validation_failed"
+
+
+@pytest.mark.anyio
+async def test_worker_schedules_new_build_for_retryable_failure() -> None:
+    build = BuildRun(
+        id=uuid4(),
+        owner_id=uuid4(),
+        recipe_version_id=uuid4(),
+        status=BuildStatus.FAILED,
+        build_identity="a" * 64,
+        attempt_number=1,
+        plan={"inputs": []},
+    )
+    job = BuildJob(
+        id=uuid4(),
+        build_run_id=build.id,
+        status=JobStatus.RUNNING,
+        progress="retrieving",
+        attempt_count=1,
+        max_attempts=3,
+        available_at=datetime.now(UTC),
+        created_at=datetime.now(UTC),
+        lease_owner="worker-1",
+    )
+    session = session_with()
+    scalar_calls = 0
+
+    async def scalar_result(_: object) -> object:
+        nonlocal scalar_calls
+        scalar_calls += 1
+        if scalar_calls == 1:
+            return job
+        if scalar_calls == 2:
+            return build
+        if scalar_calls == 3:
+            return 1
+        if scalar_calls == 4:
+            return next(
+                call.args[0]
+                for call in session.add.call_args_list
+                if isinstance(call.args[0], BuildRun)
+            )
+        return None
+
+    session.scalar = AsyncMock(side_effect=scalar_result)
+    no_inputs = MagicMock()
+    no_inputs.__iter__.return_value = iter([])
+    session.scalars.return_value = no_inputs
+    database = FakeApiDatabase(session)
+    worker = BuildWorker(
+        cast(Database, database),
+        MagicMock(spec=BuildJobExecutor),
+        worker_id="worker-1",
+        lease_seconds=60,
+        poll_seconds=0.01,
+    )
+
+    await worker._record_expected_failure(
+        job.id,
+        build.id,
+        build.owner_id,
+        BuildJobExecutionError("execution_failed", "timeout", retryable=True),
+    )
+
+    retries = [
+        call.args[0] for call in session.add.call_args_list if isinstance(call.args[0], BuildRun)
+    ]
+    queued_jobs = [
+        call.args[0] for call in session.add.call_args_list if isinstance(call.args[0], BuildJob)
+    ]
+    assert job.status is JobStatus.FAILED
+    assert retries[0].attempt_number == 2
+    assert retries[0].status is BuildStatus.QUEUED
+    assert queued_jobs[0].max_attempts == 3
+    assert queued_jobs[0].available_at > datetime.now(UTC)

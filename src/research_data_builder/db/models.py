@@ -478,7 +478,7 @@ class BuildJob(Base):
     )
     progress: Mapped[str] = mapped_column(String(32), default="queued")
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
-    max_attempts: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, server_default=text("3"))
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), server_default=func.now()
     )

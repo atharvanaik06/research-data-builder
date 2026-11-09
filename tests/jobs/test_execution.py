@@ -10,8 +10,13 @@ import pytest
 from research_data_builder.core.config import Settings
 from research_data_builder.db.models import BuildRun, BuildStatus
 from research_data_builder.db.session import Database
-from research_data_builder.jobs.execution import BuildJobExecutionError, BuildJobExecutor
+from research_data_builder.jobs.execution import (
+    BuildJobExecutionError,
+    BuildJobExecutor,
+    provider_failure_is_retryable,
+)
 from research_data_builder.providers import ProviderConnector, ProviderRegistry
+from research_data_builder.providers.errors import ProviderRequestError
 from tests.engine.test_executor import ObservationConnector, version_and_plan
 from tests.recipes.test_api_behavior import FakeApiDatabase, session_with
 
@@ -84,3 +89,13 @@ async def test_job_executor_records_provider_failure(tmp_path: Path) -> None:
     assert failure.value.code == "execution_failed"
     assert build.status is BuildStatus.FAILED
     assert build.error_code == "execution_failed"
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [(None, True), (429, True), (503, True), (400, False)],
+)
+def test_provider_retry_classification(status_code: int | None, expected: bool) -> None:
+    error = ProviderRequestError("world_bank", "request failed", status_code=status_code)
+
+    assert provider_failure_is_retryable(error) is expected

@@ -12,7 +12,7 @@ from research_data_builder.db.recipe_repositories import RecipeVersionRepository
 from research_data_builder.db.session import Database
 from research_data_builder.engine.executor import BuildExecutor
 from research_data_builder.engine.harmonize import HarmonizationError
-from research_data_builder.providers.errors import ProviderError
+from research_data_builder.providers.errors import ProviderError, ProviderRequestError
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.recipes.planner import BuildPlan
 from research_data_builder.recipes.schemas import RecipeDefinition
@@ -24,9 +24,15 @@ ProgressCallback = Callable[[str], Awaitable[None]]
 class BuildJobExecutionError(RuntimeError):
     """A claimed build failed with a stable worker error code."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
         self.code = code
+        self.retryable = retryable
         super().__init__(message)
+
+
+def provider_failure_is_retryable(error: ProviderRequestError) -> bool:
+    """Retry network failures, rate limits, and server failures."""
+    return error.status_code is None or error.status_code == 429 or error.status_code >= 500
 
 
 class BuildJobExecutor:
@@ -67,6 +73,13 @@ class BuildJobExecutor:
         try:
             plan = BuildPlan.from_dict(build.plan)
             result = await BuildExecutor(self.registry).execute(version, plan)
+        except ProviderRequestError as error:
+            await self._fail_build(build_id, owner_id, "execution_failed", str(error))
+            raise BuildJobExecutionError(
+                "execution_failed",
+                str(error),
+                retryable=provider_failure_is_retryable(error),
+            ) from error
         except (ProviderError, HarmonizationError, ValueError) as error:
             await self._fail_build(build_id, owner_id, "execution_failed", str(error))
             raise BuildJobExecutionError("execution_failed", str(error)) from error
