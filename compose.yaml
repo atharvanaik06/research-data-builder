@@ -28,6 +28,24 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+    command: ["python", "-m", "research_data_builder.jobs.worker"]
+    environment:
+      RESEARCH_DATA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-research_data}:${POSTGRES_PASSWORD:-research_data}@postgres:5432/${POSTGRES_DB:-research_data}
+      RESEARCH_DATA_ENVIRONMENT: development
+      RESEARCH_DATA_LOG_LEVEL: INFO
+      RESEARCH_DATA_ARTIFACT_ROOT: /app/artifacts
+      RESEARCH_DATA_WORKER_POLL_SECONDS: 1
+      RESEARCH_DATA_WORKER_LEASE_SECONDS: 60
+    volumes:
+      - ./artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:

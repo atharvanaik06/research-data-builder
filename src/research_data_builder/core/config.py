@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     artifact_root: Path = Path("artifacts")
     session_cookie_name: str = Field(default="research_data_session", min_length=1, max_length=64)
     session_ttl_hours: int = Field(default=168, ge=1, le=24 * 90)
+    worker_poll_seconds: float = Field(default=1.0, gt=0, le=60)
+    worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
 
     @field_validator("log_level")
     @classmethod
