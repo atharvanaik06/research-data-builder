@@ -112,7 +112,7 @@ The service records validation failures without exports. For successful builds i
 
 ## Implemented authentication and ownership schema
 
-Migrations `0005` and `0006` begin Phase 7 with:
+Migrations `0005` through `0007` begin Phase 7 with:
 
 ```text
 users
@@ -123,7 +123,9 @@ users
 
 `users` stores normalized unique email addresses, salted password hashes, and account state. `user_sessions` stores only a hash of each opaque browser token, plus expiry, revocation, and last-use timestamps. Deleting a user cascades to their sessions.
 
-Every recipe and build has a non-null owner foreign key. Versions and output records inherit access through their recipe or build. Migration `0006` assigns pre-existing local data to an inactive legacy owner so upgrading does not discard work. Build identity is unique within a frozen recipe version, allowing two users to build identical recipes without sharing mutable database records.
+Every recipe and build has a non-null owner foreign key. Versions and output records inherit access through their recipe or build. Migration `0006` assigns pre-existing local data to an inactive legacy owner so upgrading does not discard work.
+
+Migration `0007` adds a positive attempt number. The combination of recipe version, deterministic plan identity, and attempt number is unique. Attempt 1 is the initial execution; retrying a failed attempt creates attempt 2 or later as a new row with a new artifact directory. Successful and failed rows are terminal, preserving their status, outputs, checksum, validation, and lineage.
 
 ## Existing invariants
 

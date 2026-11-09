@@ -157,6 +157,7 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 | `GET /api/v1/builds/{build_id}` | Return state, timing, and summary. |
 | `GET /api/v1/builds/{build_id}/preview` | Return a bounded data preview. |
 | `POST /api/v1/builds/{build_id}/execute` | Retrieve inputs and execute the deterministic table plan. |
+| `POST /api/v1/builds/{build_id}/retry` | Create a new numbered attempt from a failed build. |
 | `GET /api/v1/builds/{build_id}/validation` | Return warnings, errors, and coverage. |
 | `GET /api/v1/builds/{build_id}/lineage` | Explain input and transformation lineage. |
 | `GET /api/v1/builds/{build_id}/exports` | List generated artifacts and checksums. |
@@ -298,7 +299,7 @@ Contract tests run the same behavioral suite against every connector fixture.
 
 Provider HTTP calls and dataframe work do not hold database transactions open. Short transactions record state transitions and completed metadata.
 
-A build moves through explicit states such as `planned`, `retrieving`, `transforming`, `validating`, `exporting`, `succeeded`, and `failed`. Required artifacts and provenance must exist before success.
+A build moves through explicit states such as `planned`, `retrieving`, `transforming`, `validating`, `exporting`, `succeeded`, and `failed`. Required artifacts and provenance must exist before success. Only `planned` can be claimed for execution; `succeeded` and `failed` are terminal. Retrying failure creates a new numbered build record rather than mutating history.
 
 Production uses an outbox or comparable mechanism when a committed state transition must publish queue work.
 

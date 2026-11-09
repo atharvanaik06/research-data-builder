@@ -143,4 +143,4 @@ docker compose up --build
 
 ## Current status
 
-The complete local research-data MVP is implemented through Phase 6. A successful build now means retrieval, deterministic transformation, validation, provenance capture, and every required artifact completed together. Phase 7 will turn this synchronous single-user workflow into a hosted multi-user product.
+The complete local research-data MVP is implemented through Phase 6, and Phase 7 is in progress. The application now has authenticated private workspaces and immutable numbered build attempts. Long-running work is still synchronous; background workers and the browser interface are the next major product slices.

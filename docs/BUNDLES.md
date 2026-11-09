@@ -16,6 +16,18 @@ The validation engine checks:
 
 Findings have `info`, `warning`, or `error` severity. Warnings remain visible but allow export. An error prevents export, persists the validation report, and moves the build to `failed`.
 
+## Immutable attempts
+
+Only a `planned` build can be claimed for execution. The claim is an atomic database update, so two requests cannot both begin the same attempt. `succeeded` and `failed` are terminal: executing either again returns a conflict and output persistence refuses to replace existing records.
+
+A temporary failure is retried explicitly:
+
+```text
+POST /api/v1/builds/{failed_build_id}/retry
+```
+
+The retry receives a new build ID, increments `attempt_number`, copies the frozen plan and resolved inputs, and writes to its own future artifact directory. The failed attempt remains available as historical evidence.
+
 ## Bundle contents
 
 Each successful build receives its own directory below the configured artifact root:
@@ -41,6 +53,7 @@ The API exposes the bounded preview separately from the potentially large files:
 
 ```text
 GET /api/v1/builds/{build_id}
+POST /api/v1/builds/{failed_build_id}/retry
 GET /api/v1/builds/{build_id}/preview
 GET /api/v1/builds/{build_id}/validation
 GET /api/v1/builds/{build_id}/lineage

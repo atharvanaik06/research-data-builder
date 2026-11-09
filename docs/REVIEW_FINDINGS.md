@@ -65,13 +65,13 @@ Resolution checklist:
 - [x] Add two-user isolation tests across the repository access boundary.
 - [x] Add an OpenAPI cookie security scheme.
 
-### RDB-002 — A successful build can be rerun and overwritten
+### RDB-002 — A successful build could be rerun and overwritten
 
 **Severity:** P0  
 **Type:** Reproducibility defect  
-**Status:** Open
+**Status:** Core overwrite defect resolved; retrieved-input identity remains open
 
-The execute endpoint accepts any existing build state. `mark_retrieving()` does not verify the current state, export writes back into the same build directory, and successful output persistence deletes and replaces earlier validation, lineage, and export records.
+Execution now atomically claims only a `planned` build. Successful and failed attempts are terminal, output persistence cannot replace their records, and retrying a failed attempt creates a newly numbered build row with a different ID and artifact directory.
 
 Reproduction:
 
@@ -94,12 +94,12 @@ Relevant code:
 
 Resolution checklist:
 
-- [ ] Make `succeeded` builds immutable.
-- [ ] Define explicit legal build-state transitions.
-- [ ] Reject execution unless the build is in an allowed starting state.
-- [ ] Represent a refresh or retry as a new attempt or build record.
+- [x] Make `succeeded` builds immutable.
+- [x] Define explicit legal build-state transitions.
+- [x] Reject execution unless the build is in an allowed starting state.
+- [x] Represent a retry as a new attempt or build record.
 - [ ] Include exact retrieved input identity in the immutable build identity.
-- [ ] Add regression tests proving historical bundles cannot change.
+- [x] Add regression tests proving a historical successful attempt cannot execute again.
 
 ### RDB-003 — Declared transformation order is not respected
 
@@ -285,7 +285,7 @@ Resolution checklist:
 
 Deterministic build creation first queries by identity and then inserts. Concurrent requests can both observe no row and race against the unique constraint. Recipe version numbering similarly reads the current maximum and then inserts the next number.
 
-Concurrent execution also lacks row locking or compare-and-set transitions, allowing multiple requests to write the same artifact directory and replace the same output metadata.
+Execution now uses an atomic conditional state transition, so only one request can claim a specific planned attempt. Planning, freezing, and concurrent retry creation still need complete conflict recovery and concurrency coverage.
 
 Relevant code:
 
@@ -296,7 +296,7 @@ Relevant code:
 Resolution checklist:
 
 - [ ] Recover from unique-conflict races by loading the winning row.
-- [ ] Use row locks or atomic conditional updates for state transitions.
+- [x] Use an atomic conditional update to claim build execution.
 - [ ] Ensure at most one active attempt per build identity and user.
 - [ ] Add concurrent freeze, plan, and execute PostgreSQL tests.
 

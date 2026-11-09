@@ -97,6 +97,7 @@ added while executing the plan in the next phases.
 | `POST /api/v1/recipe-versions/{id}/builds` | Resolve or reuse a deterministic plan. |
 | `GET /api/v1/builds/{id}` | Inspect build status, identity, and resolved inputs. |
 | `POST /api/v1/builds/{id}/execute` | Retrieve, harmonize, transform, and join inputs. |
+| `POST /api/v1/builds/{id}/retry` | Create a new numbered attempt from a failed build. |
 | `GET /api/v1/builds/{id}/preview` | Read the stored bounded table preview. |
 
 FRED build planning requires a configured API key. World Bank planning is keyless. A provider

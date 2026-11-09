@@ -257,11 +257,15 @@ Delivered so far:
 - Authenticated access on every private research and artifact route.
 - Not-found behavior that does not disclose another user's resource existence.
 - OpenAPI cookie-security documentation and two-user PostgreSQL isolation coverage.
-- Migrations `0005` and `0006` with PostgreSQL lifecycle and ownership coverage.
+- Atomic execution claims that prevent two requests from running the same attempt.
+- Terminal successful and failed builds that cannot be executed or overwritten again.
+- Explicit failed-build retry as a new numbered build ID and artifact directory.
+- Migrations `0005` through `0007` with PostgreSQL lifecycle, ownership, and attempt coverage.
 
 Deliverables:
 
 - Authentication and recipe/build ownership. **Complete.**
+- Immutable numbered build attempts and terminal-state enforcement. **Complete.**
 - Background build queue and workers.
 - Job progress and cancellation policy.
 - Idempotent job handling and terminal failure states.
