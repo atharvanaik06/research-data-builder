@@ -154,6 +154,10 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                 assert second.build.id == first.build.id
                 build_id = first.build.id
 
+            async with database.session() as session, session.begin():
+                claimed = await BuildRepository(session).claim_execution(build_id, owner_id)
+                assert claimed.status is BuildStatus.RETRIEVING
+
             execution = await BuildExecutor(registry).execute(version, plan)
             validation = validate_dataset(execution, definition)
             assert validation.passed is True
