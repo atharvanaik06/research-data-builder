@@ -131,6 +131,7 @@ docker compose up --build
 
 - [Product requirements](docs/REQUIREMENTS.md)
 - [System design](docs/SYSTEM_DESIGN.md)
+- [Interactive system design](docs/research-data-builder-design.html)
 - [Phased build and commit plan](docs/ROADMAP.md)
 - [Database design and migrations](docs/DATABASE.md)
 - [Provider connectors](docs/PROVIDERS.md)
