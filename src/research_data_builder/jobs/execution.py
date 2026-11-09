@@ -12,6 +12,7 @@ from research_data_builder.db.recipe_repositories import RecipeVersionRepository
 from research_data_builder.db.session import Database
 from research_data_builder.engine.executor import BuildExecutor
 from research_data_builder.engine.harmonize import HarmonizationError
+from research_data_builder.jobs.repository import BuildJobRepository
 from research_data_builder.providers.errors import ProviderError, ProviderRequestError
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.recipes.planner import BuildPlan
@@ -89,6 +90,7 @@ class BuildJobExecutor:
         validation = validate_dataset(result, recipe)
         if not validation.passed:
             async with self.database.session() as session, session.begin():
+                await BuildJobRepository(session).ensure_not_cancelled_for_build(build_id)
                 invalid_build = await BuildRepository(session).get(build_id, owner_id)
                 if invalid_build is None:
                     raise BuildJobExecutionError("build_not_found", "build does not exist")
@@ -121,7 +123,9 @@ class BuildJobExecutor:
             await self._fail_build(build_id, owner_id, "export_failed", str(error))
             raise BuildJobExecutionError("export_failed", str(error)) from error
 
+        await progress("finalizing")
         async with self.database.session() as session, session.begin():
+            await BuildJobRepository(session).ensure_not_cancelled_for_build(build_id)
             completed_build = await BuildRepository(session).get(build_id, owner_id)
             if completed_build is None:
                 raise BuildJobExecutionError("build_not_found", "build does not exist")
@@ -145,6 +149,7 @@ class BuildJobExecutor:
         error_message: str,
     ) -> None:
         async with self.database.session() as session, session.begin():
+            await BuildJobRepository(session).ensure_not_cancelled_for_build(build_id)
             build = await BuildRepository(session).get(build_id, owner_id)
             if build is not None:
                 await BuildRepository(session).fail(

@@ -118,8 +118,9 @@ class BuildRepository:
         raise BuildTransitionError(current.status, BuildStatus.RETRIEVING)
 
     async def create_retry(self, build: BuildRun) -> BuildRun:
-        """Create a new planned row for one failed attempt without mutating history."""
-        self._require_status(build, BuildStatus.FAILED, BuildStatus.PLANNED)
+        """Create a new planned row for one failed or cancelled attempt."""
+        if build.status not in {BuildStatus.FAILED, BuildStatus.CANCELLED}:
+            raise BuildTransitionError(build.status, BuildStatus.PLANNED)
         latest_attempt = await self.session.scalar(
             select(func.max(BuildRun.attempt_number)).where(
                 BuildRun.owner_id == build.owner_id,

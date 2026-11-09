@@ -138,6 +138,12 @@ async def test_build_repository_retries_failed_build_as_new_attempt() -> None:
     ]
     assert copied_inputs[0].output_name == "gdp_growth"
 
+    source.status = BuildStatus.CANCELLED
+    session.scalar = AsyncMock(return_value=2)
+    cancelled_retry = await BuildRepository(session).create_retry(source)
+    assert cancelled_retry.status is BuildStatus.PLANNED
+    assert cancelled_retry.attempt_number == 3
+
     source.status = BuildStatus.SUCCEEDED
     with pytest.raises(BuildTransitionError, match="succeeded to planned"):
         await BuildRepository(session).create_retry(source)

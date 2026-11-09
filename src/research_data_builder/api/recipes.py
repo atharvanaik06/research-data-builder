@@ -75,6 +75,7 @@ class BuildJobResource(BaseModel):
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    cancel_requested_at: datetime | None = None
     error_code: str | None = None
     error_message: str | None = None
 
@@ -141,6 +142,7 @@ def job_resource(job: BuildJob) -> BuildJobResource:
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,
+        cancel_requested_at=job.cancel_requested_at,
         error_code=job.error_code,
         error_message=job.error_message,
     )
@@ -346,7 +348,7 @@ async def retry_build(
     request: Request,
     user: AuthenticatedUser,
 ) -> BuildResource:
-    """Create a new immutable attempt for one failed build."""
+    """Create a new immutable attempt for one failed or cancelled build."""
     database: Database = request.app.state.database
     async with database.session() as session, session.begin():
         repository = BuildRepository(session)
@@ -411,6 +413,33 @@ async def get_build_job(
         job = await BuildJobRepository(session).get_for_build(build_id, user.id)
         if job is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+        return job_resource(job)
+
+
+@router.post(
+    "/builds/{build_id}/cancel",
+    response_model=BuildJobResource,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def cancel_build(
+    build_id: UUID,
+    request: Request,
+    user: AuthenticatedUser,
+) -> BuildJobResource:
+    """Cancel a queued build or request cancellation of a running build."""
+    database: Database = request.app.state.database
+    async with database.session() as session, session.begin():
+        try:
+            job = await BuildJobRepository(session).request_cancel(build_id, user.id)
+        except LookupError as error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="job not found"
+            ) from error
+        except JobTransitionError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "build_not_cancellable", "message": str(error)},
+            ) from error
         return job_resource(job)
 
 

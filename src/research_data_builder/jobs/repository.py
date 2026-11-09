@@ -14,6 +14,10 @@ class JobTransitionError(ValueError):
     """A job or build cannot move to the requested state."""
 
 
+class JobCancellationRequested(RuntimeError):
+    """The user requested cancellation of a running job."""
+
+
 @dataclass(frozen=True, slots=True)
 class EnqueuedJobResult:
     """A queued job and its creation status."""
@@ -116,6 +120,23 @@ class BuildJobRepository:
         )
         return updated_id is not None
 
+    async def cancellation_requested(self, job_id: UUID, worker_id: str) -> bool:
+        requested_at = await self.session.scalar(
+            select(BuildJob.cancel_requested_at).where(
+                BuildJob.id == job_id,
+                BuildJob.status == JobStatus.RUNNING,
+                BuildJob.lease_owner == worker_id,
+            )
+        )
+        return requested_at is not None
+
+    async def ensure_not_cancelled_for_build(self, build_id: UUID) -> None:
+        job = await self.session.scalar(
+            select(BuildJob).where(BuildJob.build_run_id == build_id).with_for_update()
+        )
+        if job is not None and job.cancel_requested_at is not None:
+            raise JobCancellationRequested("the user requested build cancellation")
+
     async def set_progress(self, job_id: UUID, worker_id: str, progress: str) -> None:
         updated_id = await self.session.scalar(
             update(BuildJob)
@@ -123,12 +144,67 @@ class BuildJobRepository:
                 BuildJob.id == job_id,
                 BuildJob.status == JobStatus.RUNNING,
                 BuildJob.lease_owner == worker_id,
+                BuildJob.cancel_requested_at.is_(None),
             )
             .values(progress=progress)
             .returning(BuildJob.id)
         )
         if updated_id is None:
+            if await self.cancellation_requested(job_id, worker_id):
+                raise JobCancellationRequested("the user requested build cancellation")
             raise JobTransitionError("worker does not own the running job")
+
+    async def request_cancel(self, build_id: UUID, owner_id: UUID) -> BuildJob:
+        job = await self.session.scalar(
+            select(BuildJob)
+            .join(BuildRun, BuildRun.id == BuildJob.build_run_id)
+            .where(BuildJob.build_run_id == build_id, BuildRun.owner_id == owner_id)
+            .with_for_update()
+        )
+        if job is None:
+            raise LookupError("job does not exist")
+        build = await self.session.scalar(
+            select(BuildRun).where(BuildRun.id == build_id).with_for_update()
+        )
+        if build is None:
+            raise LookupError("build does not exist")
+        if job.status is JobStatus.CANCELLED:
+            return job
+        if job.status is JobStatus.QUEUED and build.status is BuildStatus.QUEUED:
+            self._mark_cancelled(job, build)
+        elif job.status is JobStatus.RUNNING and build.status in self._active_build_statuses():
+            job.cancel_requested_at = job.cancel_requested_at or datetime.now(UTC)
+            job.progress = "cancelling"
+        else:
+            raise JobTransitionError(
+                f"job status must be queued or running, not {job.status.value}"
+            )
+        await self.session.flush()
+        return job
+
+    async def complete_cancellation(self, job_id: UUID, worker_id: str) -> BuildJob:
+        job = await self.session.scalar(
+            select(BuildJob)
+            .where(
+                BuildJob.id == job_id,
+                BuildJob.status == JobStatus.RUNNING,
+                BuildJob.lease_owner == worker_id,
+                BuildJob.cancel_requested_at.is_not(None),
+            )
+            .with_for_update()
+        )
+        if job is None:
+            raise JobTransitionError("worker does not own the cancelled job")
+        build = await self.session.scalar(
+            select(BuildRun).where(BuildRun.id == job.build_run_id).with_for_update()
+        )
+        if build is None:
+            raise LookupError("build does not exist")
+        if build.status not in self._active_build_statuses():
+            raise JobTransitionError(f"build cannot be cancelled from {build.status.value}")
+        self._mark_cancelled(job, build)
+        await self.session.flush()
+        return job
 
     async def succeed(self, job_id: UUID, worker_id: str) -> BuildJob:
         job = await self._owned_running_job(job_id, worker_id)
@@ -207,3 +283,27 @@ class BuildJobRepository:
         if job is None:
             raise JobTransitionError("worker does not own the running job")
         return job
+
+    @staticmethod
+    def _active_build_statuses() -> set[BuildStatus]:
+        return {
+            BuildStatus.RETRIEVING,
+            BuildStatus.TRANSFORMING,
+            BuildStatus.VALIDATING,
+            BuildStatus.EXPORTING,
+        }
+
+    @staticmethod
+    def _mark_cancelled(job: BuildJob, build: BuildRun) -> None:
+        now = datetime.now(UTC)
+        job.status = JobStatus.CANCELLED
+        job.progress = "cancelled"
+        job.finished_at = now
+        job.error_code = "cancelled_by_user"
+        job.error_message = "the user cancelled this build"
+        job.lease_owner = None
+        job.lease_expires_at = None
+        build.status = BuildStatus.CANCELLED
+        build.finished_at = now
+        build.error_code = "cancelled_by_user"
+        build.error_message = "the user cancelled this build"

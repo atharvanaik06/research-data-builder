@@ -15,6 +15,7 @@ from fastapi import HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from research_data_builder.api.recipes import (
+    cancel_build,
     compare_build_resources,
     create_recipe,
     download_export,
@@ -45,6 +46,7 @@ from research_data_builder.db.models import (
     DatasetRecipe,
     DatasetValidationResult,
     ExportArtifact,
+    JobStatus,
     RecipeVersion,
     User,
 )
@@ -347,6 +349,39 @@ async def test_build_api_queues_and_returns_background_job() -> None:
     detail = cast(dict[str, object], immutable.value.detail)
     assert detail["code"] == "build_not_executable"
     assert detail["status"] == "succeeded"
+
+
+@pytest.mark.anyio
+async def test_build_api_cancels_owned_queued_job() -> None:
+    build = BuildRun(
+        id=uuid4(),
+        owner_id=TEST_USER.id,
+        recipe_version_id=uuid4(),
+        status=BuildStatus.QUEUED,
+        build_identity="a" * 64,
+        attempt_number=1,
+        plan={"inputs": []},
+    )
+    job = BuildJob(
+        id=uuid4(),
+        build_run_id=build.id,
+        status=JobStatus.QUEUED,
+        progress="queued",
+        attempt_count=0,
+        max_attempts=3,
+        available_at=datetime.now(UTC),
+        created_at=datetime.now(UTC),
+    )
+
+    response = await cancel_build(
+        build.id,
+        api_request(FakeApiDatabase(session_with(job, build))),
+        TEST_USER,
+    )
+
+    assert response.status == "cancelled"
+    assert response.progress == "cancelled"
+    assert build.status is BuildStatus.CANCELLED
 
 
 @pytest.mark.anyio

@@ -16,7 +16,10 @@ from research_data_builder.db.build_repositories import BuildRepository
 from research_data_builder.db.models import BuildRun, BuildStatus
 from research_data_builder.db.session import Database
 from research_data_builder.jobs.execution import BuildJobExecutionError, BuildJobExecutor
-from research_data_builder.jobs.repository import BuildJobRepository
+from research_data_builder.jobs.repository import (
+    BuildJobRepository,
+    JobCancellationRequested,
+)
 from research_data_builder.providers.runtime import ProviderRuntime
 
 logger = logging.getLogger(__name__)
@@ -58,14 +61,34 @@ class BuildWorker:
             owner_id = build.owner_id
 
         stop_heartbeat = asyncio.Event()
-        heartbeat = asyncio.create_task(self._heartbeat_loop(job_id, stop_heartbeat))
+        cancel_requested = asyncio.Event()
+        heartbeat = asyncio.create_task(
+            self._heartbeat_loop(job_id, stop_heartbeat, cancel_requested)
+        )
 
         async def progress(value: str) -> None:
             async with self.database.session() as session, session.begin():
                 await BuildJobRepository(session).set_progress(job_id, self.worker_id, value)
 
         try:
-            await self.executor.execute(build_id, owner_id, progress=progress)
+            execution = asyncio.create_task(
+                self.executor.execute(build_id, owner_id, progress=progress)
+            )
+            cancellation = asyncio.create_task(cancel_requested.wait())
+            done, _ = await asyncio.wait(
+                {execution, cancellation}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if cancellation in done and cancel_requested.is_set() and not execution.done():
+                execution.cancel()
+                with suppress(asyncio.CancelledError):
+                    await execution
+                raise JobCancellationRequested("the user requested build cancellation")
+            cancellation.cancel()
+            with suppress(asyncio.CancelledError):
+                await cancellation
+            await execution
+        except JobCancellationRequested:
+            await self._record_cancellation(job_id)
         except BuildJobExecutionError as error:
             await self._record_expected_failure(job_id, build_id, owner_id, error)
         except Exception as error:
@@ -114,20 +137,30 @@ class BuildWorker:
             if not processed:
                 await asyncio.sleep(self.poll_seconds)
 
-    async def _heartbeat_loop(self, job_id: UUID, stop: asyncio.Event) -> None:
-        interval = max(1.0, self.lease_seconds / 3)
+    async def _heartbeat_loop(
+        self,
+        job_id: UUID,
+        stop: asyncio.Event,
+        cancel_requested: asyncio.Event,
+    ) -> None:
+        interval = min(2.0, max(0.25, self.lease_seconds / 3))
         while not stop.is_set():
             try:
                 await asyncio.wait_for(stop.wait(), timeout=interval)
             except TimeoutError:
                 async with self.database.session() as session, session.begin():
-                    active = await BuildJobRepository(session).heartbeat(
-                        job_id,
-                        self.worker_id,
-                        self.lease_seconds,
-                    )
+                    jobs = BuildJobRepository(session)
+                    active = await jobs.heartbeat(job_id, self.worker_id, self.lease_seconds)
+                    requested = active and await jobs.cancellation_requested(job_id, self.worker_id)
+                if requested:
+                    cancel_requested.set()
+                    return
                 if not active:
                     return
+
+    async def _record_cancellation(self, job_id: UUID) -> None:
+        async with self.database.session() as session, session.begin():
+            await BuildJobRepository(session).complete_cancellation(job_id, self.worker_id)
 
     async def _record_unexpected_failure(
         self,

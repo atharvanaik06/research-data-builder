@@ -36,7 +36,7 @@ async def test_job_executor_completes_claimed_build(tmp_path: Path) -> None:
     )
     database = FakeApiDatabase(
         session_with(build, version),
-        session_with(build),
+        session_with(None, build),
     )
     registry = ProviderRegistry([cast(ProviderConnector, ObservationConnector())])
     progress = AsyncMock()
@@ -57,6 +57,7 @@ async def test_job_executor_completes_claimed_build(tmp_path: Path) -> None:
         "retrieving",
         "validating",
         "exporting",
+        "finalizing",
     ]
 
 
@@ -75,7 +76,7 @@ async def test_job_executor_records_provider_failure(tmp_path: Path) -> None:
     )
     database = FakeApiDatabase(
         session_with(build, version),
-        session_with(build),
+        session_with(None, build),
     )
     executor = BuildJobExecutor(
         cast(Database, database),

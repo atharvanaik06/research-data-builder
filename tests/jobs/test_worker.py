@@ -1,5 +1,6 @@
 """Tests for the independent background worker process."""
 
+import asyncio
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -201,3 +202,92 @@ async def test_worker_schedules_new_build_for_retryable_failure() -> None:
     assert retries[0].status is BuildStatus.QUEUED
     assert queued_jobs[0].max_attempts == 3
     assert queued_jobs[0].available_at > datetime.now(UTC)
+
+
+@pytest.mark.anyio
+async def test_worker_completes_requested_cancellation() -> None:
+    build = BuildRun(
+        id=uuid4(),
+        owner_id=uuid4(),
+        recipe_version_id=uuid4(),
+        status=BuildStatus.RETRIEVING,
+        build_identity="a" * 64,
+        attempt_number=1,
+        plan={"inputs": []},
+    )
+    job = BuildJob(
+        id=uuid4(),
+        build_run_id=build.id,
+        status=JobStatus.RUNNING,
+        progress="cancelling",
+        attempt_count=1,
+        max_attempts=3,
+        available_at=datetime.now(UTC),
+        created_at=datetime.now(UTC),
+        lease_owner="worker-1",
+        cancel_requested_at=datetime.now(UTC),
+    )
+    worker = BuildWorker(
+        cast(Database, FakeApiDatabase(session_with(job, build))),
+        MagicMock(spec=BuildJobExecutor),
+        worker_id="worker-1",
+        lease_seconds=60,
+        poll_seconds=0.01,
+    )
+
+    await worker._record_cancellation(job.id)
+
+    assert job.status is JobStatus.CANCELLED
+    assert job.progress == "cancelled"
+    assert build.status is BuildStatus.CANCELLED
+
+
+@pytest.mark.anyio
+async def test_worker_stops_execution_when_heartbeat_finds_cancellation() -> None:
+    build = BuildRun(
+        id=uuid4(),
+        owner_id=uuid4(),
+        recipe_version_id=uuid4(),
+        status=BuildStatus.QUEUED,
+        build_identity="a" * 64,
+        attempt_number=1,
+        plan={"inputs": []},
+    )
+    job = BuildJob(
+        id=uuid4(),
+        build_run_id=build.id,
+        status=JobStatus.QUEUED,
+        progress="queued",
+        attempt_count=0,
+        max_attempts=3,
+        available_at=datetime.now(UTC),
+        created_at=datetime.now(UTC),
+    )
+    claim_session = session_with(job, build)
+    no_expired = MagicMock()
+    no_expired.__iter__.return_value = iter([])
+    claim_session.scalars.return_value = no_expired
+    heartbeat_session = session_with(job.id, datetime.now(UTC))
+    database = FakeApiDatabase(
+        claim_session,
+        session_with(build),
+        heartbeat_session,
+        session_with(job, build),
+    )
+    executor = MagicMock(spec=BuildJobExecutor)
+
+    async def wait_until_cancelled(*_: object, **__: object) -> None:
+        await asyncio.Event().wait()
+
+    executor.execute = AsyncMock(side_effect=wait_until_cancelled)
+    worker = BuildWorker(
+        cast(Database, database),
+        executor,
+        worker_id="worker-1",
+        lease_seconds=0,
+        poll_seconds=0.01,
+    )
+
+    assert await worker.run_once() is True
+    assert job.status is JobStatus.CANCELLED
+    assert build.status.value == BuildStatus.CANCELLED.value
