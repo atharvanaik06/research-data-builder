@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://persistent.oaistatic.com/plugins/visualize/; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://persistent.oaistatic.com/plugins/visualize/charts/; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Research Data Builder Design</title>
 <style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
 
@@ -16,7 +16,7 @@
 &lt;meta charset=&quot;utf-8&quot;&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
 &lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
-&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://persistent.oaistatic.com/plugins/visualize/; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://persistent.oaistatic.com/plugins/visualize/charts/; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
 &lt;title&gt;Research Data Builder Design&lt;/title&gt;
 &lt;style&gt;:root {
   color-scheme: light dark;
@@ -585,7 +585,6 @@ small,
 
 .btn,
 .nav-link {
-  --btn-size: calc(12px + 2 * var(--control-spacing, 12px));
   appearance: button;
   display: inline-flex;
   inline-size: fit-content;
@@ -606,7 +605,7 @@ small,
   -webkit-font-smoothing: inherit;
   font-family: var(--font-sans);
   height: fit-content;
-  min-height: var(--btn-size);
+  min-height: calc(12px + 2 * var(--control-spacing, 12px));
   padding-inline: var(--control-spacing, 12px);
   border-color: transparent;
   border-radius: var(--radius-full);
@@ -622,15 +621,6 @@ small,
   border-color: var(--border);
   color: var(--secondary-foreground);
   background: var(--secondary);
-}
-
-/* Codex Button size=&quot;compact&quot;; appearance stays with the button variant. */
-.btn-sm {
-  --btn-size: 24px;
-  padding-inline: 8px;
-  font-size: calc(var(--font-size-base) * 12 / 16);
-  font-size: round(nearest, calc(var(--font-size-base) * 12 / 16), 1px);
-  line-height: 16px;
 }
 
 .btn:is(.btn-block, .viz-tile) {
@@ -1366,17 +1356,6 @@ textarea.form-control {
     );
   }
 
-  .btn-sm {
-    font-size: if(
-      style(--corner-shape: round): round(
-          nearest,
-          calc(var(--font-size-base) * 12 / 16),
-          1px
-        );
-        else: round(nearest, calc(var(--font-size-base) * 12 / 14), 1px)
-    );
-  }
-
   .btn,
   .nav-link,
   .form-select {
@@ -1411,7 +1390,6 @@ textarea.form-control {
   .viz-carousel-picker &gt; summary,
   .form-control,
   .form-select {
-    --btn-size: 44px;
     min-width: 44px;
     min-height: 44px;
   }
@@ -1677,42 +1655,11 @@ html&gt;body{padding:0}&lt;/style&gt;
       postToHost(&quot;widget-state-write&quot;, { id, state: serializedState });
     });
   };
-  const mockElement = document.getElementById(&quot;codex-connector-mocks&quot;);
-  const connectorGlobals = {};
-  if (mockElement != null) {
-    const values = new Map(Object.entries(parse(mockElement.textContent)));
-    mockElement.remove();
-    connectorGlobals.visualizationData = {
-      updates: Array.from(values, ([name, value]) =&gt; ({
-        name,
-        revision: 1,
-        state: &quot;ready&quot;,
-        value: { type: &quot;json&quot;, value },
-      })),
-    };
-    connectorGlobals.visualization = {
-      /** @param {string} name @param {(value: unknown) =&gt; void} callback */
-      onData(name, callback) {
-        if (typeof callback !== &quot;function&quot;) {
-          throw new TypeError(&quot;onData requires a callback&quot;);
-        }
-        try {
-          callback(values.get(name));
-        } catch (error) {
-          // oxlint-disable-next-line no-console -- Keep authored callback failures local.
-          console.error(&quot;Live visualization data callback failed&quot;, error);
-        }
-        // A static preview delivers the current fixture once per subscription.
-        return () =&gt; {};
-      },
-    };
-  }
   const syncTheme = () =&gt; {
     const theme = mediaQuery.matches ? &quot;dark&quot; : &quot;light&quot;;
     root.dataset.theme = theme;
     globalThis.openai = {
       ...globalThis.openai,
-      ...connectorGlobals,
       openExternal,
       sendFollowUpMessage,
       setWidgetState,
@@ -1843,265 +1790,198 @@ html&gt;body{padding:0}&lt;/style&gt;
   syncTheme();
 })();
 &lt;/script&gt;
-&lt;div id=&quot;rdb-design&quot;&gt;
+&lt;div id=&quot;rdb-architecture-sketch&quot;&gt;
   &lt;style&gt;
-    #rdb-design {
+    #rdb-architecture-sketch {
       color: var(--foreground);
-      display: grid;
-      gap: calc(var(--font-size-base) * 1.25);
-    }
-    #rdb-design .intro {
-      display: grid;
-      gap: calc(var(--font-size-base) * .4);
-      max-width: 78ch;
-    }
-    #rdb-design .purpose {
-      color: var(--muted-foreground);
-    }
-    #rdb-design .system-map {
-      display: grid;
-      grid-template-columns: minmax(120px, .8fr) 44px minmax(150px, 1fr) 44px minmax(170px, 1.2fr);
-      gap: calc(var(--font-size-base) * .6);
-      align-items: stretch;
-    }
-    #rdb-design .lane {
-      display: grid;
-      gap: calc(var(--font-size-base) * .55);
-      align-content: center;
-    }
-    #rdb-design .node {
-      background: color-mix(in srgb, var(--viz-series-1) 8%, var(--background));
-      color: var(--foreground);
-      padding: calc(var(--font-size-base) * .8);
-      min-height: calc(var(--font-size-base) * 4.2);
-      display: grid;
-      align-content: center;
-      gap: calc(var(--font-size-base) * .25);
-      border-left: 3px solid var(--viz-series-1);
-    }
-    #rdb-design .node.secondary {
-      background: color-mix(in srgb, var(--muted) 75%, transparent);
-      border-left-color: color-mix(in srgb, var(--foreground) 35%, var(--background));
-    }
-    #rdb-design .node strong {
-      font-weight: 500;
-    }
-    #rdb-design .node span {
-      color: var(--muted-foreground);
-    }
-    #rdb-design .arrow {
-      min-width: 40px;
-      align-self: center;
-      color: color-mix(in srgb, var(--foreground) 65%, var(--background));
-    }
-    #rdb-design .arrow svg {
-      display: block;
       width: 100%;
-      height: 22px;
+      font-family: &quot;Bradley Hand&quot;, &quot;Segoe Print&quot;, &quot;Comic Sans MS&quot;, cursive;
     }
-    #rdb-design .flow {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: calc(var(--font-size-base) * .55);
-      align-items: start;
+    #rdb-architecture-sketch .diagram { display: block; width: 100%; height: auto; overflow: visible; }
+    #rdb-architecture-sketch .shape {
+      fill: var(--background);
+      stroke: var(--foreground);
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
     }
-    #rdb-design .step {
-      display: grid;
-      gap: calc(var(--font-size-base) * .4);
-      position: relative;
-      min-width: 0;
+    #rdb-architecture-sketch .soft-shape { fill: color-mix(in srgb, var(--viz-series-1) 6%, var(--background)); }
+    #rdb-architecture-sketch .group-shape {
+      fill: none;
+      stroke: color-mix(in srgb, var(--foreground) 55%, var(--background));
+      stroke-width: 1.4;
+      stroke-dasharray: 7 7;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
     }
-    #rdb-design .step:not(:last-child)::after {
-      content: &quot;→&quot;;
-      color: var(--muted-foreground);
-      position: absolute;
-      right: calc(var(--font-size-base) * -.62);
-      top: calc(var(--font-size-base) * 1.35);
+    #rdb-architecture-sketch .flow-line {
+      fill: none;
+      stroke: var(--foreground);
+      stroke-width: 1.55;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
     }
-    #rdb-design .step-mark {
-      width: calc(var(--font-size-base) * 2.7);
-      height: calc(var(--font-size-base) * 2.7);
-      display: grid;
-      place-items: center;
-      background: color-mix(in srgb, var(--viz-series-1) 12%, var(--background));
-      color: var(--foreground);
-      border-radius: 50%;
-      font-weight: 500;
+    #rdb-architecture-sketch .retry-line { stroke: var(--orange); stroke-dasharray: 5 5; }
+    #rdb-architecture-sketch text {
+      fill: var(--foreground);
+      font-family: &quot;Bradley Hand&quot;, &quot;Segoe Print&quot;, &quot;Comic Sans MS&quot;, cursive;
+      font-weight: 400;
     }
-    #rdb-design .step span,
-    #rdb-design .guarantee span {
-      color: var(--muted-foreground);
-    }
-    #rdb-design .guarantees {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: calc(var(--font-size-base) * .8);
-    }
-    #rdb-design .guarantee {
-      display: grid;
-      gap: calc(var(--font-size-base) * .25);
-      padding-top: calc(var(--font-size-base) * .6);
-      border-top: 2px solid color-mix(in srgb, var(--viz-series-1) 35%, var(--background));
-    }
-    #rdb-design .retry-path {
-      display: grid;
-      grid-template-columns: 1fr 44px 1fr 44px 1fr;
-      align-items: center;
-      gap: calc(var(--font-size-base) * .55);
-    }
-    #rdb-design .decision {
-      padding: calc(var(--font-size-base) * .8);
-      background: color-mix(in srgb, var(--muted) 75%, transparent);
-      display: grid;
-      gap: calc(var(--font-size-base) * .3);
-      min-height: calc(var(--font-size-base) * 4.2);
-      align-content: center;
-    }
-    #rdb-design .decision.retry {
-      border-left: 3px solid var(--orange);
-    }
-    #rdb-design .decision.stop {
-      border-left: 3px solid var(--red);
-    }
-    #rdb-design .state-line {
-      display: flex;
-      flex-wrap: wrap;
-      gap: calc(var(--font-size-base) * .45);
-      align-items: center;
-    }
-    #rdb-design .state-line .viz-badge {
-      background: color-mix(in srgb, var(--viz-series-1) 12%, var(--background));
-      color: var(--foreground);
-    }
-    @media (max-width: 720px) {
-      #rdb-design .system-map,
-      #rdb-design .retry-path {
-        grid-template-columns: 1fr;
+    #rdb-architecture-sketch .title { font-size: 23px; font-weight: 500; }
+    #rdb-architecture-sketch .node-title { font-size: 16px; font-weight: 500; }
+    #rdb-architecture-sketch .node-text { font-size: 12px; fill: var(--muted-foreground); }
+    #rdb-architecture-sketch .edge-label { font-size: 12px; }
+    #rdb-architecture-sketch .section-label,
+    #rdb-architecture-sketch .legend { font-size: 12px; fill: var(--muted-foreground); }
+    #rdb-architecture-sketch .mobile-flow { display: none; }
+    @media (max-width: 580px) {
+      #rdb-architecture-sketch .desktop-diagram { display: none; }
+      #rdb-architecture-sketch .mobile-flow { display: grid; gap: 0; }
+      #rdb-architecture-sketch .mobile-heading { text-align: center; display: grid; gap: 4px; margin-bottom: 12px; }
+      #rdb-architecture-sketch .mobile-heading strong { font-size: 20px; font-weight: 500; }
+      #rdb-architecture-sketch .mobile-heading span { color: var(--muted-foreground); }
+      #rdb-architecture-sketch .mobile-node {
+        background: var(--background);
+        border: 1.5px solid var(--foreground);
+        border-radius: 16px 18px 15px 17px;
+        padding: 12px 14px;
+        display: grid;
+        gap: 3px;
       }
-      #rdb-design .arrow {
-        width: 40px;
-        justify-self: center;
-        transform: rotate(90deg);
+      #rdb-architecture-sketch .mobile-node:nth-of-type(4n+1) {
+        background: color-mix(in srgb, var(--viz-series-1) 6%, var(--background));
       }
-      #rdb-design .flow,
-      #rdb-design .guarantees {
-        grid-template-columns: 1fr;
-      }
-      #rdb-design .step {
-        grid-template-columns: auto 1fr;
-        align-items: center;
-      }
-      #rdb-design .step:not(:last-child)::after {
-        content: &quot;↓&quot;;
-        left: calc(var(--font-size-base) * 1.05);
-        right: auto;
-        top: calc(100% - var(--font-size-base) * .18);
-      }
+      #rdb-architecture-sketch .mobile-node strong { font-weight: 500; }
+      #rdb-architecture-sketch .mobile-node span { color: var(--muted-foreground); }
+      #rdb-architecture-sketch .mobile-arrow { min-height: 44px; display: grid; place-items: center; color: var(--foreground); }
+      #rdb-architecture-sketch .mobile-arrow::before { content: &quot;↓&quot;; font-size: 24px; }
+      #rdb-architecture-sketch .mobile-arrow small { color: var(--muted-foreground); }
+      #rdb-architecture-sketch .mobile-retry { color: var(--orange); }
     }
   &lt;/style&gt;
 
-  &lt;div class=&quot;intro&quot;&gt;
-    &lt;h1&gt;Research Data Builder&lt;/h1&gt;
-    &lt;p class=&quot;purpose&quot;&gt;The system turns a saved research recipe into a checked and repeatable dataset bundle.&lt;/p&gt;
+  &lt;svg class=&quot;diagram desktop-diagram&quot; viewBox=&quot;0 0 900 650&quot; role=&quot;img&quot; aria-labelledby=&quot;rdb-title rdb-desc&quot;&gt;
+    &lt;title id=&quot;rdb-title&quot;&gt;Research Data Builder system design&lt;/title&gt;
+    &lt;desc id=&quot;rdb-desc&quot;&gt;A researcher uses the FastAPI service. PostgreSQL stores recipes and queued jobs. A worker retrieves public data, runs the build engine, and writes a documented research bundle.&lt;/desc&gt;
+    &lt;defs&gt;
+      &lt;marker id=&quot;rdb-arrow&quot; orient=&quot;auto&quot; markerUnits=&quot;userSpaceOnUse&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;10&quot; markerHeight=&quot;10&quot;&gt;
+        &lt;path d=&quot;M1 1 L9 5 L1 9&quot; fill=&quot;none&quot; stroke=&quot;var(--foreground)&quot; stroke-width=&quot;1.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;
+      &lt;/marker&gt;
+      &lt;marker id=&quot;rdb-retry-arrow&quot; orient=&quot;auto&quot; markerUnits=&quot;userSpaceOnUse&quot; refX=&quot;9&quot; refY=&quot;5&quot; markerWidth=&quot;10&quot; markerHeight=&quot;10&quot;&gt;
+        &lt;path d=&quot;M1 1 L9 5 L1 9&quot; fill=&quot;none&quot; stroke=&quot;var(--orange)&quot; stroke-width=&quot;1.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;
+      &lt;/marker&gt;
+    &lt;/defs&gt;
+
+    &lt;text class=&quot;title&quot; x=&quot;450&quot; y=&quot;30&quot; text-anchor=&quot;middle&quot;&gt;Research Data Builder — System Design&lt;/text&gt;
+
+    &lt;path class=&quot;group-shape&quot; d=&quot;M20 205 Q19 190 35 188 L186 190 Q201 191 202 207 L201 431 Q200 446 185 447 L35 446 Q20 444 21 429 Z&quot;/&gt;
+    &lt;text class=&quot;section-label&quot; x=&quot;34&quot; y=&quot;180&quot;&gt;RESEARCH WORKSPACE&lt;/text&gt;
+    &lt;path class=&quot;shape soft-shape&quot; d=&quot;M43 232 Q42 220 55 219 L167 220 Q180 220 181 233 L180 320 Q180 333 167 334 L55 333 Q43 332 43 319 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;112&quot; y=&quot;254&quot; text-anchor=&quot;middle&quot;&gt;Researcher&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;112&quot; y=&quot;278&quot; text-anchor=&quot;middle&quot;&gt;Create recipe&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;112&quot; y=&quot;297&quot; text-anchor=&quot;middle&quot;&gt;Check build status&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;112&quot; y=&quot;316&quot; text-anchor=&quot;middle&quot;&gt;Preview or download&lt;/text&gt;
+    &lt;path class=&quot;shape&quot; d=&quot;M43 356 Q42 347 52 346 L171 347 Q181 347 181 357 L180 414 Q180 423 170 424 L53 423 Q43 422 43 413 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;112&quot; y=&quot;379&quot; text-anchor=&quot;middle&quot;&gt;Browser session&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;112&quot; y=&quot;401&quot; text-anchor=&quot;middle&quot;&gt;Secure cookie&lt;/text&gt;
+
+    &lt;path class=&quot;shape soft-shape&quot; d=&quot;M253 169 Q251 151 270 150 L415 151 Q433 152 434 171 L432 452 Q431 470 413 471 L270 470 Q252 469 253 451 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;343&quot; y=&quot;194&quot; text-anchor=&quot;middle&quot;&gt;FastAPI service&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M274 210 Q343 207 413 211&quot;/&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;237&quot; text-anchor=&quot;middle&quot;&gt;Authentication&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;260&quot; text-anchor=&quot;middle&quot;&gt;Ownership checks&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;283&quot; text-anchor=&quot;middle&quot;&gt;Recipe and version APIs&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;306&quot; text-anchor=&quot;middle&quot;&gt;Build and status APIs&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;329&quot; text-anchor=&quot;middle&quot;&gt;Artifact downloads&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M274 349 Q343 352 413 349&quot;/&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;380&quot; text-anchor=&quot;middle&quot;&gt;Returns 202 when a build&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;343&quot; y=&quot;401&quot; text-anchor=&quot;middle&quot;&gt;enters the job queue&lt;/text&gt;
+
+    &lt;path class=&quot;shape&quot; d=&quot;M492 63 Q491 49 506 48 L648 49 Q663 50 664 64 L663 148 Q662 163 647 164 L507 163 Q492 162 492 147 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;578&quot; y=&quot;79&quot; text-anchor=&quot;middle&quot;&gt;PostgreSQL&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;103&quot; text-anchor=&quot;middle&quot;&gt;Users, recipes, versions&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;122&quot; text-anchor=&quot;middle&quot;&gt;Jobs, leases, heartbeats&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;141&quot; text-anchor=&quot;middle&quot;&gt;Lineage, checks, results&lt;/text&gt;
+
+    &lt;path class=&quot;shape soft-shape&quot; d=&quot;M491 246 Q489 230 506 229 L648 231 Q664 232 665 248 L664 365 Q663 381 647 382 L507 381 Q491 380 491 364 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;578&quot; y=&quot;263&quot; text-anchor=&quot;middle&quot;&gt;Background worker&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;290&quot; text-anchor=&quot;middle&quot;&gt;Claim one queued job&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;311&quot; text-anchor=&quot;middle&quot;&gt;Hold lease and heartbeat&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;332&quot; text-anchor=&quot;middle&quot;&gt;Run build outside API&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;353&quot; text-anchor=&quot;middle&quot;&gt;Retry temporary failures&lt;/text&gt;
+
+    &lt;path class=&quot;group-shape&quot; d=&quot;M710 55 Q708 43 722 42 L875 44 Q887 44 888 57 L887 221 Q886 233 873 234 L723 233 Q710 232 710 219 Z&quot;/&gt;
+    &lt;text class=&quot;section-label&quot; x=&quot;721&quot; y=&quot;34&quot;&gt;PUBLIC DATA PROVIDERS&lt;/text&gt;
+    &lt;path class=&quot;shape&quot; d=&quot;M731 78 Q730 69 740 68 L856 69 Q866 70 866 80 L865 131 Q864 141 854 142 L741 141 Q731 140 731 130 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;798&quot; y=&quot;101&quot; text-anchor=&quot;middle&quot;&gt;FRED&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;798&quot; y=&quot;123&quot; text-anchor=&quot;middle&quot;&gt;US economic series&lt;/text&gt;
+    &lt;path class=&quot;shape&quot; d=&quot;M731 159 Q730 150 740 149 L856 150 Q866 151 866 161 L865 212 Q864 222 854 223 L741 222 Q731 221 731 211 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;798&quot; y=&quot;182&quot; text-anchor=&quot;middle&quot;&gt;World Bank&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;798&quot; y=&quot;204&quot; text-anchor=&quot;middle&quot;&gt;Country indicators&lt;/text&gt;
+
+    &lt;path class=&quot;shape soft-shape&quot; d=&quot;M713 289 Q711 274 727 273 L872 275 Q887 276 888 291 L887 433 Q886 449 870 450 L728 449 Q713 448 713 432 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;800&quot; y=&quot;306&quot; text-anchor=&quot;middle&quot;&gt;Build engine&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;800&quot; y=&quot;334&quot; text-anchor=&quot;middle&quot;&gt;Normalize entities and dates&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;800&quot; y=&quot;356&quot; text-anchor=&quot;middle&quot;&gt;Transform and join variables&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;800&quot; y=&quot;378&quot; text-anchor=&quot;middle&quot;&gt;Validate coverage and values&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;800&quot; y=&quot;400&quot; text-anchor=&quot;middle&quot;&gt;Create lineage and checksum&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;800&quot; y=&quot;422&quot; text-anchor=&quot;middle&quot;&gt;Generate export bundle&lt;/text&gt;
+
+    &lt;path class=&quot;shape&quot; d=&quot;M492 500 Q490 486 506 485 L649 487 Q665 488 665 503 L664 602 Q663 617 647 618 L507 617 Q492 616 492 601 Z&quot;/&gt;
+    &lt;text class=&quot;node-title&quot; x=&quot;578&quot; y=&quot;519&quot; text-anchor=&quot;middle&quot;&gt;Research bundle store&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;545&quot; text-anchor=&quot;middle&quot;&gt;CSV and Parquet&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;566&quot; text-anchor=&quot;middle&quot;&gt;Codebook and citations&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;587&quot; text-anchor=&quot;middle&quot;&gt;Manifest and validation report&lt;/text&gt;
+    &lt;text class=&quot;node-text&quot; x=&quot;578&quot; y=&quot;606&quot; text-anchor=&quot;middle&quot;&gt;Local files now · S3 later&lt;/text&gt;
+
+    &lt;path class=&quot;flow-line&quot; d=&quot;M202 290 C220 286 230 286 252 291&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M252 318 C232 323 220 323 202 318&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;227&quot; y=&quot;273&quot; text-anchor=&quot;middle&quot;&gt;recipes, builds&lt;/text&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;227&quot; y=&quot;345&quot; text-anchor=&quot;middle&quot;&gt;status, files&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M432 199 C459 175 466 137 491 115&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;448&quot; y=&quot;139&quot; text-anchor=&quot;middle&quot;&gt;save state&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M579 164 C576 188 576 205 577 229&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;622&quot; y=&quot;201&quot;&gt;claim job&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M665 267 C687 236 698 192 730 173&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;682&quot; y=&quot;220&quot;&gt;fetch observations&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M730 208 C700 230 693 272 665 294&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;693&quot; y=&quot;263&quot;&gt;normalized data&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M665 333 C683 334 695 337 712 345&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;689&quot; y=&quot;323&quot; text-anchor=&quot;middle&quot;&gt;execute recipe&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M752 449 C710 475 685 503 664 534&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;705&quot; y=&quot;489&quot;&gt;write bundle&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M713 386 C671 392 642 397 614 382&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;664&quot; y=&quot;379&quot;&gt;result&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M492 550 C444 547 417 506 403 471&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;430&quot; y=&quot;531&quot;&gt;authorized download&lt;/text&gt;
+    &lt;path class=&quot;flow-line retry-line&quot; d=&quot;M538 382 C511 414 518 442 562 444 C612 446 639 418 619 382&quot; marker-end=&quot;url(#rdb-retry-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;577&quot; y=&quot;462&quot; text-anchor=&quot;middle&quot;&gt;temporary error: retry after 5s, then 10s&lt;/text&gt;
+    &lt;path class=&quot;flow-line&quot; d=&quot;M491 332 C466 325 451 313 433 304&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;edge-label&quot; x=&quot;463&quot; y=&quot;348&quot; text-anchor=&quot;middle&quot;&gt;progress&lt;/text&gt;
+    &lt;line class=&quot;flow-line&quot; x1=&quot;24&quot; y1=&quot;635&quot; x2=&quot;54&quot; y2=&quot;635&quot; marker-end=&quot;url(#rdb-arrow)&quot;/&gt;
+    &lt;text class=&quot;legend&quot; x=&quot;64&quot; y=&quot;639&quot;&gt;request or data flow&lt;/text&gt;
+    &lt;line class=&quot;flow-line retry-line&quot; x1=&quot;195&quot; y1=&quot;635&quot; x2=&quot;225&quot; y2=&quot;635&quot; marker-end=&quot;url(#rdb-retry-arrow)&quot;/&gt;
+    &lt;text class=&quot;legend&quot; x=&quot;236&quot; y=&quot;639&quot;&gt;retry and recovery path&lt;/text&gt;
+  &lt;/svg&gt;
+
+  &lt;div class=&quot;mobile-flow&quot; role=&quot;img&quot; aria-label=&quot;Research Data Builder flow from researcher to API, database, worker, providers, build engine, and research bundle.&quot;&gt;
+    &lt;div class=&quot;mobile-heading&quot;&gt;&lt;strong&gt;Research Data Builder&lt;/strong&gt;&lt;span&gt;System design&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;Researcher and browser&lt;/strong&gt;&lt;span&gt;Create recipe · Start build · Check status · Download result&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;secure request&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;FastAPI service&lt;/strong&gt;&lt;span&gt;Authentication · Ownership · Recipe and build APIs · Return 202&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;save queued job&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;PostgreSQL&lt;/strong&gt;&lt;span&gt;Users · Recipes · Jobs · Leases · Lineage · Results&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;claim job&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;Background worker&lt;/strong&gt;&lt;span&gt;Lease · Heartbeat · Progress · &lt;span class=&quot;mobile-retry&quot;&gt;Bounded retry&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;fetch observations&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;FRED and World Bank&lt;/strong&gt;&lt;span&gt;Public economic observations&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;execute recipe&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;Build engine&lt;/strong&gt;&lt;span&gt;Normalize · Transform · Join · Validate · Record lineage&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-arrow&quot;&gt;&lt;small&gt;write bundle&lt;/small&gt;&lt;/div&gt;
+    &lt;div class=&quot;mobile-node&quot;&gt;&lt;strong&gt;Research bundle store&lt;/strong&gt;&lt;span&gt;CSV · Parquet · Codebook · Citations · Manifest · Validation report&lt;/span&gt;&lt;/div&gt;
   &lt;/div&gt;
-
-  &lt;div class=&quot;nav nav-pills&quot; role=&quot;tablist&quot; aria-label=&quot;System design views&quot;&gt;
-    &lt;button class=&quot;nav-link active&quot; id=&quot;map-tab&quot; role=&quot;tab&quot; aria-controls=&quot;map-panel&quot; aria-selected=&quot;true&quot; type=&quot;button&quot;&gt;System map&lt;/button&gt;
-    &lt;button class=&quot;nav-link&quot; id=&quot;flow-tab&quot; role=&quot;tab&quot; aria-controls=&quot;flow-panel&quot; aria-selected=&quot;false&quot; type=&quot;button&quot;&gt;Build flow&lt;/button&gt;
-    &lt;button class=&quot;nav-link&quot; id=&quot;reliability-tab&quot; role=&quot;tab&quot; aria-controls=&quot;reliability-panel&quot; aria-selected=&quot;false&quot; type=&quot;button&quot;&gt;Reliability&lt;/button&gt;
-  &lt;/div&gt;
-
-  &lt;section id=&quot;map-panel&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;map-tab&quot;&gt;
-    &lt;div class=&quot;system-map&quot; role=&quot;img&quot; aria-label=&quot;A researcher sends a recipe to the API. PostgreSQL stores state and queues the build. A worker gets source data, creates the dataset, checks it, and writes the export bundle.&quot;&gt;
-      &lt;div class=&quot;lane&quot;&gt;
-        &lt;div class=&quot;node&quot;&gt;
-          &lt;strong&gt;Researcher&lt;/strong&gt;
-          &lt;span&gt;Selects data and saves a recipe&lt;/span&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;arrow&quot; aria-hidden=&quot;true&quot;&gt;
-        &lt;svg viewBox=&quot;0 0 60 22&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;path d=&quot;M2 11H54M47 4l7 7-7 7&quot;/&gt;&lt;/svg&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;lane&quot;&gt;
-        &lt;div class=&quot;node&quot;&gt;
-          &lt;strong&gt;FastAPI service&lt;/strong&gt;
-          &lt;span&gt;Checks identity, ownership, and recipe rules&lt;/span&gt;
-        &lt;/div&gt;
-        &lt;div class=&quot;node secondary&quot;&gt;
-          &lt;strong&gt;PostgreSQL&lt;/strong&gt;
-          &lt;span&gt;Stores recipes, jobs, lineage, and results&lt;/span&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;arrow&quot; aria-hidden=&quot;true&quot;&gt;
-        &lt;svg viewBox=&quot;0 0 60 22&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;path d=&quot;M2 11H54M47 4l7 7-7 7&quot;/&gt;&lt;/svg&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;lane&quot;&gt;
-        &lt;div class=&quot;node&quot;&gt;
-          &lt;strong&gt;Background worker&lt;/strong&gt;
-          &lt;span&gt;Claims one queued build and sends heartbeats&lt;/span&gt;
-        &lt;/div&gt;
-        &lt;div class=&quot;node secondary&quot;&gt;
-          &lt;strong&gt;FRED and World Bank&lt;/strong&gt;
-          &lt;span&gt;Provide public economic observations&lt;/span&gt;
-        &lt;/div&gt;
-        &lt;div class=&quot;node secondary&quot;&gt;
-          &lt;strong&gt;Build engine&lt;/strong&gt;
-          &lt;span&gt;Normalizes, joins, transforms, and validates&lt;/span&gt;
-        &lt;/div&gt;
-        &lt;div class=&quot;node secondary&quot;&gt;
-          &lt;strong&gt;Research bundle&lt;/strong&gt;
-          &lt;span&gt;Contains data, codebook, citations, checks, and lineage&lt;/span&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
-    &lt;/div&gt;
-  &lt;/section&gt;
-
-  &lt;section id=&quot;flow-panel&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;flow-tab&quot; hidden&gt;
-    &lt;div class=&quot;flow&quot; role=&quot;img&quot; aria-label=&quot;Five steps: save a versioned recipe, queue a build, retrieve and normalize source data, transform and validate the dataset, and export a documented bundle.&quot;&gt;
-      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;step-mark&quot;&gt;1&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Freeze recipe&lt;/strong&gt;&lt;br&gt;&lt;span&gt;Keep one exact research definition&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
-      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;step-mark&quot;&gt;2&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Queue build&lt;/strong&gt;&lt;br&gt;&lt;span&gt;Return control to the user at once&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
-      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;step-mark&quot;&gt;3&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Get inputs&lt;/strong&gt;&lt;br&gt;&lt;span&gt;Retrieve and normalize provider data&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
-      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;step-mark&quot;&gt;4&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Build and check&lt;/strong&gt;&lt;br&gt;&lt;span&gt;Transform, join, and validate&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
-      &lt;div class=&quot;step&quot;&gt;&lt;div class=&quot;step-mark&quot;&gt;5&lt;/div&gt;&lt;div&gt;&lt;strong&gt;Export bundle&lt;/strong&gt;&lt;br&gt;&lt;span&gt;Write data and proof of its origin&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;
-    &lt;/div&gt;
-    &lt;hr&gt;
-    &lt;div class=&quot;state-line&quot; aria-label=&quot;Build states&quot;&gt;
-      &lt;span class=&quot;viz-badge&quot;&gt;planned&lt;/span&gt;&lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;
-      &lt;span class=&quot;viz-badge&quot;&gt;queued&lt;/span&gt;&lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;
-      &lt;span class=&quot;viz-badge&quot;&gt;running&lt;/span&gt;&lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;
-      &lt;span class=&quot;viz-badge&quot;&gt;validating&lt;/span&gt;&lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;
-      &lt;span class=&quot;viz-badge&quot;&gt;succeeded or failed&lt;/span&gt;
-    &lt;/div&gt;
-  &lt;/section&gt;
-
-  &lt;section id=&quot;reliability-panel&quot; role=&quot;tabpanel&quot; aria-labelledby=&quot;reliability-tab&quot; hidden&gt;
-    &lt;div class=&quot;retry-path&quot; role=&quot;img&quot; aria-label=&quot;A worker claims a job with a lease. A temporary provider error causes a new attempt after a short delay. A permanent error stops the build. The system allows no more than three attempts.&quot;&gt;
-      &lt;div class=&quot;decision&quot;&gt;
-        &lt;strong&gt;Worker claims the job&lt;/strong&gt;
-        &lt;span&gt;A lease prevents duplicate work. A heartbeat proves that the worker is active.&lt;/span&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;arrow&quot; aria-hidden=&quot;true&quot;&gt;
-        &lt;svg viewBox=&quot;0 0 60 22&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;path d=&quot;M2 11H54M47 4l7 7-7 7&quot;/&gt;&lt;/svg&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;decision retry&quot;&gt;
-        &lt;strong&gt;Temporary error&lt;/strong&gt;
-        &lt;span&gt;The system creates a new attempt. It waits 5 seconds, then 10 seconds.&lt;/span&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;arrow&quot; aria-hidden=&quot;true&quot;&gt;
-        &lt;svg viewBox=&quot;0 0 60 22&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.5&quot;&gt;&lt;path d=&quot;M2 11H54M47 4l7 7-7 7&quot;/&gt;&lt;/svg&gt;
-      &lt;/div&gt;
-      &lt;div class=&quot;decision stop&quot;&gt;
-        &lt;strong&gt;Permanent error&lt;/strong&gt;
-        &lt;span&gt;The build stops. The failure record remains available for review.&lt;/span&gt;
-      &lt;/div&gt;
-    &lt;/div&gt;
-    &lt;hr&gt;
-    &lt;div class=&quot;guarantees&quot;&gt;
-      &lt;div class=&quot;guarantee&quot;&gt;&lt;strong&gt;Repeatable&lt;/strong&gt;&lt;span&gt;The same recipe and inputs produce the same logical dataset.&lt;/span&gt;&lt;/div&gt;
-      &lt;div class=&quot;guarantee&quot;&gt;&lt;strong&gt;Traceable&lt;/strong&gt;&lt;span&gt;The bundle records every source and transformation.&lt;/span&gt;&lt;/div&gt;
-      &lt;div class=&quot;guarantee&quot;&gt;&lt;strong&gt;Private&lt;/strong&gt;&lt;span&gt;Each user can access only the research that they own.&lt;/span&gt;&lt;/div&gt;
-    &lt;/div&gt;
-  &lt;/section&gt;
 &lt;/div&gt;
 
 &lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
