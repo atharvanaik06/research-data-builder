@@ -16,6 +16,9 @@ POST build execution request
 ```text
 queued → running → succeeded
                  → failed
+                 → cancelled
+
+queued → cancelled
 ```
 
 The job progress field uses these values:
@@ -25,8 +28,11 @@ queued
 retrieving
 validating
 exporting
+finalizing
+cancelling
 succeeded
 failed
+cancelled
 ```
 
 ## Ownership and duplicate requests
@@ -52,6 +58,24 @@ Each retry creates a new numbered build and a new job. The worker keeps the fail
 The worker waits 5 seconds before attempt 2. It waits 10 seconds before attempt 3. The worker stops after attempt 3.
 
 The worker does not retry configuration errors, invalid provider responses, validation failures, or export failures.
+
+## Cancellation
+
+The user can cancel a queued or running build with this route:
+
+```text
+POST /api/v1/builds/{build_id}/cancel
+```
+
+The system cancels a queued job immediately.
+
+For a running job, the system records a cancellation request. The worker checks for this request while it runs. It stops the active operation and marks the job and build as `cancelled`.
+
+Cancellation is idempotent. A second cancellation request returns the same cancelled job. A successful or failed job cannot become cancelled.
+
+The system keeps the cancelled build record. It stores the error code `cancelled_by_user` so the audit history shows why the build stopped.
+
+The user can retry a cancelled build. The retry creates a new numbered build and keeps the cancelled build as history.
 
 ## Local services
 

@@ -264,14 +264,15 @@ Delivered so far:
 - A separate worker process with job claims, leases, heartbeats, and expired-lease failure handling.
 - Automatic numbered retries for temporary provider failures, with bounded delays.
 - Immediate `202 Accepted` responses and authenticated job progress queries.
-- Migrations `0005` through `0009` with PostgreSQL job and retry coverage.
+- Immediate cancellation for queued jobs and cooperative cancellation for running jobs.
+- Migrations `0005` through `0010` with PostgreSQL job, retry, and cancellation coverage.
 
 Deliverables:
 
 - Authentication and recipe/build ownership. **Complete.**
 - Immutable numbered build attempts and terminal-state enforcement. **Complete.**
 - Background build queue and workers. **Complete.**
-- Job progress. **Complete.** Cancellation remains open.
+- Job progress and cancellation. **Complete.**
 - Idempotent job handling and terminal failure states.
 - Provider input cache and refresh policies.
 - Authorized artifact downloads.

@@ -159,7 +159,8 @@ Routes are versioned under `/api/v1`. Timestamps use ISO 8601 UTC. Decimal value
 | `GET /api/v1/builds/{build_id}/preview` | Return a bounded data preview. |
 | `POST /api/v1/builds/{build_id}/execute` | Queue a build and return `202 Accepted`. |
 | `GET /api/v1/builds/{build_id}/job` | Return queue status, progress, attempts, and errors. |
-| `POST /api/v1/builds/{build_id}/retry` | Create a new numbered attempt from a failed build. |
+| `POST /api/v1/builds/{build_id}/cancel` | Cancel a queued build or request cancellation of a running build. |
+| `POST /api/v1/builds/{build_id}/retry` | Create a new numbered attempt from a failed or cancelled build. |
 | `GET /api/v1/builds/{build_id}/validation` | Return warnings, errors, and coverage. |
 | `GET /api/v1/builds/{build_id}/lineage` | Explain input and transformation lineage. |
 | `GET /api/v1/builds/{build_id}/exports` | List generated artifacts and checksums. |

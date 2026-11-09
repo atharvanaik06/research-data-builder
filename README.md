@@ -49,7 +49,7 @@ The local MVP will support:
 
 Browser interfaces, cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
 
-Phase 7 is in progress. The product includes secure accounts, private research ownership, immutable builds, and a PostgreSQL background queue.
+Phase 7 is in progress. The product includes secure accounts, private research ownership, immutable builds, a PostgreSQL background queue, and build cancellation.
 
 ## Current product
 
