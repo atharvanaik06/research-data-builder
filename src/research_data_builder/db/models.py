@@ -390,9 +390,11 @@ class BuildRun(Base):
         UniqueConstraint(
             "recipe_version_id",
             "build_identity",
-            name="uq_build_runs_version_identity",
+            "attempt_number",
+            name="uq_build_runs_version_identity_attempt",
         ),
         CheckConstraint("length(build_identity) = 64", name="build_identity_length"),
+        CheckConstraint("attempt_number > 0", name="build_attempt_number_positive"),
         CheckConstraint("row_count IS NULL OR row_count >= 0", name="build_row_count_nonnegative"),
     )
 
@@ -414,6 +416,7 @@ class BuildRun(Base):
         default=BuildStatus.PLANNED,
     )
     build_identity: Mapped[str] = mapped_column(String(64))
+    attempt_number: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
     plan: Mapped[dict[str, Any]] = mapped_column(JSON)
     row_count: Mapped[int | None] = mapped_column(Integer)
     preview: Mapped[dict[str, Any] | None] = mapped_column(JSON)

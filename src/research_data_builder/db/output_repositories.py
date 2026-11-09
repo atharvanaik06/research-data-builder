@@ -4,10 +4,11 @@ from datetime import UTC, datetime
 from typing import ClassVar
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from research_data_builder.artifacts.models import BundleResult
+from research_data_builder.db.build_repositories import BuildTransitionError
 from research_data_builder.db.models import (
     BuildLineage,
     BuildRun,
@@ -43,14 +44,13 @@ class BuildOutputRepository:
         bundle: BundleResult,
         validation: ValidationReport,
     ) -> BuildRun:
+        if build.status is not BuildStatus.VALIDATING:
+            raise BuildTransitionError(build.status, BuildStatus.SUCCEEDED)
         if not validation.passed:
             raise ValueError("cannot succeed a build with validation errors")
         artifact_names = {artifact.name for artifact in bundle.artifacts}
         if not self.REQUIRED_DOCUMENTS.issubset(artifact_names):
             raise ValueError("required research-bundle artifacts are missing")
-
-        for model in (DatasetValidationResult, BuildLineage, ExportArtifact):
-            await self.session.execute(delete(model).where(model.build_run_id == build.id))
 
         self._add_validation(build.id, validation)
         self.session.add(BuildLineage(build_run_id=build.id, content=bundle.lineage))
@@ -77,11 +77,10 @@ class BuildOutputRepository:
         build: BuildRun,
         validation: ValidationReport,
     ) -> BuildRun:
+        if build.status is not BuildStatus.VALIDATING:
+            raise BuildTransitionError(build.status, BuildStatus.FAILED)
         if validation.passed:
             raise ValueError("validation failure requires at least one blocking error")
-        await self.session.execute(
-            delete(DatasetValidationResult).where(DatasetValidationResult.build_run_id == build.id)
-        )
         self._add_validation(build.id, validation)
         build.status = BuildStatus.FAILED
         build.finished_at = datetime.now(UTC)

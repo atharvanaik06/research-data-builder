@@ -31,10 +31,12 @@ from research_data_builder.api.recipes import (
     list_recipe_versions,
     list_recipes,
     plan_build,
+    retry_build,
     update_recipe,
 )
 from research_data_builder.core.config import Settings
 from research_data_builder.db.models import (
+    BuildInput,
     BuildLineage,
     BuildRun,
     BuildStatus,
@@ -269,6 +271,7 @@ async def test_build_api_resolves_persists_reuses_and_reads_plans() -> None:
         recipe_version_id=version.id,
         status=BuildStatus.PLANNED,
         build_identity="a" * 64,
+        attempt_number=1,
         plan={"inputs": []},
     )
     fetched = await get_build(
@@ -286,6 +289,7 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
         recipe_version_id=version.id,
         status=BuildStatus.PLANNED,
         build_identity=plan.build_identity,
+        attempt_number=1,
         plan=plan.as_dict(),
     )
     registry = ProviderRegistry([cast(ProviderConnector, ObservationConnector())])
@@ -312,6 +316,25 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
     assert build.preview is not None
     assert build.preview["truncated"] is True
 
+    with pytest.raises(HTTPException) as immutable:
+        await execute_build(
+            build.id,
+            api_request(
+                FakeApiDatabase(
+                    session_with(build, version),
+                    session_with(None, build),
+                ),
+                registry=registry,
+                settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
+            ),
+            TEST_USER,
+            preview_limit=1,
+        )
+    assert immutable.value.status_code == 409
+    detail = cast(dict[str, object], immutable.value.detail)
+    assert detail["code"] == "build_not_executable"
+    assert detail["status"] == "succeeded"
+
     preview = await get_build_preview(
         build.id,
         api_request(FakeApiDatabase(session_with(build))),
@@ -319,6 +342,44 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
     )
     assert preview.preview_row_count == 1
     assert preview.total_row_count == 2
+
+
+@pytest.mark.anyio
+async def test_build_api_retries_failure_as_new_numbered_attempt() -> None:
+    version, plan = version_and_plan()
+    failed = BuildRun(
+        id=uuid4(),
+        owner_id=TEST_USER.id,
+        recipe_version_id=version.id,
+        status=BuildStatus.FAILED,
+        build_identity=plan.build_identity,
+        attempt_number=1,
+        plan=plan.as_dict(),
+    )
+    source_input = BuildInput(
+        build_run_id=failed.id,
+        output_name="gdp_growth",
+        provider="world_bank",
+        indicator_id="NY.GDP.MKTP.KD.ZG",
+        request={"entity_ids": ["CZE"]},
+        indicator_metadata={"title": "GDP growth"},
+        indicator_fingerprint="a" * 64,
+    )
+    session = session_with(failed, 1)
+    input_rows = MagicMock()
+    input_rows.__iter__.return_value = iter([source_input])
+    session.scalars.return_value = input_rows
+
+    retried = await retry_build(
+        failed.id,
+        api_request(FakeApiDatabase(session)),
+        TEST_USER,
+    )
+
+    assert retried.id != failed.id
+    assert retried.status == "planned"
+    assert retried.attempt_number == 2
+    assert failed.status is BuildStatus.FAILED
 
 
 @pytest.mark.anyio

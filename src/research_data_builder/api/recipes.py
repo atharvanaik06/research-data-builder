@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from research_data_builder.artifacts import export_research_bundle
 from research_data_builder.auth.dependencies import require_user
 from research_data_builder.core.config import Settings
-from research_data_builder.db.build_repositories import BuildRepository
+from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
 from research_data_builder.db.models import BuildRun, DatasetRecipe, RecipeVersion, User
 from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
@@ -52,6 +52,7 @@ class BuildResource(BaseModel):
     recipe_version_id: UUID
     status: str
     build_identity: str
+    attempt_number: int
     plan: dict[str, object]
     row_count: int | None = None
     execution_summary: dict[str, object] | None = None
@@ -110,6 +111,7 @@ def build_resource(build: BuildRun) -> BuildResource:
         recipe_version_id=build.recipe_version_id,
         status=build.status.value,
         build_identity=build.build_identity,
+        attempt_number=build.attempt_number,
         plan=build.plan,
         row_count=build.row_count,
         execution_summary=build.execution_summary,
@@ -308,6 +310,37 @@ async def get_build(build_id: UUID, request: Request, user: AuthenticatedUser) -
         return build_resource(build)
 
 
+@router.post(
+    "/builds/{build_id}/retry",
+    response_model=BuildResource,
+    status_code=status.HTTP_201_CREATED,
+)
+async def retry_build(
+    build_id: UUID,
+    request: Request,
+    user: AuthenticatedUser,
+) -> BuildResource:
+    """Create a new immutable attempt for one failed build."""
+    database: Database = request.app.state.database
+    async with database.session() as session, session.begin():
+        repository = BuildRepository(session)
+        build = await repository.get(build_id, user.id)
+        if build is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
+        try:
+            retry = await repository.create_retry(build)
+        except BuildTransitionError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "build_not_retryable",
+                    "message": str(error),
+                    "status": error.current.value,
+                },
+            ) from error
+        return build_resource(retry)
+
+
 @router.post("/builds/{build_id}/execute", response_model=BuildResource)
 async def execute_build(
     build_id: UUID,
@@ -328,10 +361,21 @@ async def execute_build(
             )
 
     async with database.session() as session, session.begin():
-        active_build = await BuildRepository(session).get(build_id, user.id)
-        if active_build is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        await BuildRepository(session).mark_retrieving(active_build)
+        try:
+            await BuildRepository(session).claim_execution(build_id, user.id)
+        except LookupError as error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="build not found"
+            ) from error
+        except BuildTransitionError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "build_not_executable",
+                    "message": str(error),
+                    "status": error.current.value,
+                },
+            ) from error
 
     try:
         plan = BuildPlan.from_dict(build.plan)

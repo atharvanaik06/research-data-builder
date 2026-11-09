@@ -12,11 +12,12 @@ import pytest
 from sqlalchemy import delete
 
 from research_data_builder.artifacts import export_research_bundle
-from research_data_builder.db.build_repositories import BuildRepository
+from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
 from research_data_builder.db.models import (
     BuildInput,
     BuildLineage,
     BuildRun,
+    BuildStatus,
     DatasetRecipe,
     DatasetValidationResult,
     ExportArtifact,
@@ -197,6 +198,10 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                     "manifest.json",
                 }
 
+            async with database.session() as session, session.begin():
+                with pytest.raises(BuildTransitionError, match="succeeded to retrieving"):
+                    await BuildRepository(session).claim_execution(build_id, owner_id)
+
             changed = definition.model_copy(update={"name": "Changed draft"})
             async with database.session() as session, session.begin():
                 stored_recipe = await RecipeRepository(session).get(recipe_id, owner_id)
@@ -277,6 +282,19 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 await session.flush()
                 second_export_id = second_export.id
 
+            async with database.session() as session, session.begin():
+                builds = BuildRepository(session)
+                claimed = await builds.claim_execution(second_build_id, second_user_id)
+                await builds.fail(
+                    claimed,
+                    error_code="provider_timeout",
+                    error_message="temporary provider failure",
+                )
+                retry = await builds.create_retry(claimed)
+                retry_build_id = retry.id
+                assert retry.attempt_number == 2
+                assert retry.id != second_build_id
+
             assert first_build_id != second_build_id
             async with database.session() as session:
                 recipes = RecipeRepository(session)
@@ -288,11 +306,16 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 assert await recipes.get(second_recipe_id, first_user_id) is None
                 assert await versions.get(second_version_id, first_user_id) is None
                 assert await builds.get(second_build_id, first_user_id) is None
+                assert await builds.get(retry_build_id, first_user_id) is None
                 assert await outputs.get_export(second_export_id, first_user_id) is None
 
                 assert await recipes.get(second_recipe_id, second_user_id) is not None
                 assert await versions.get(second_version_id, second_user_id) is not None
                 assert await builds.get(second_build_id, second_user_id) is not None
+                stored_retry = await builds.get(retry_build_id, second_user_id)
+                assert stored_retry is not None
+                assert stored_retry.status is BuildStatus.PLANNED
+                assert stored_retry.attempt_number == 2
                 assert await outputs.get_export(second_export_id, second_user_id) is not None
         finally:
             await clear_recipes(database)
