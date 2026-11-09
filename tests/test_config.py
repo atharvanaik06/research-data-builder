@@ -33,6 +33,15 @@ def test_settings_reject_invalid_log_level() -> None:
         Settings(log_level="verbose", _env_file=None)  # type: ignore[call-arg]
 
 
+def test_settings_treat_blank_optional_fred_key_as_unconfigured() -> None:
+    settings = Settings(
+        fred_api_key="",  # type: ignore[arg-type]
+        _env_file=None,  # type: ignore[call-arg]
+    )
+
+    assert settings.fred_api_key is None
+
+
 def test_settings_reject_invalid_provider_http_policy() -> None:
     with pytest.raises(ValidationError):
         Settings(provider_http_max_attempts=0, _env_file=None)  # type: ignore[call-arg]

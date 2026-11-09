@@ -48,6 +48,14 @@ class Settings(BaseSettings):
             raise ValueError(message)
         return normalized
 
+    @field_validator("fred_api_key", mode="before")
+    @classmethod
+    def normalize_optional_fred_key(cls, value: object) -> object:
+        """Treat the blank example value as an unconfigured optional provider."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
 
 @lru_cache
 def get_settings() -> Settings:
