@@ -35,7 +35,7 @@ async def test_job_executor_completes_claimed_build(tmp_path: Path) -> None:
         plan=plan.as_dict(),
     )
     database = FakeApiDatabase(
-        session_with(build, version),
+        session_with(build, version, None),
         session_with(None, build),
     )
     registry = ProviderRegistry([cast(ProviderConnector, ObservationConnector())])
@@ -75,7 +75,7 @@ async def test_job_executor_records_provider_failure(tmp_path: Path) -> None:
         plan=plan.as_dict(),
     )
     database = FakeApiDatabase(
-        session_with(build, version),
+        session_with(build, version, None),
         session_with(None, build),
     )
     executor = BuildJobExecutor(

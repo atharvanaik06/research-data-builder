@@ -9,6 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from research_data_builder.audit import AuditRepository
 from research_data_builder.auth.dependencies import require_user
 from research_data_builder.core.config import Settings
 from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
@@ -16,7 +17,11 @@ from research_data_builder.db.models import BuildJob, BuildRun, DatasetRecipe, R
 from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
 from research_data_builder.db.session import Database
-from research_data_builder.jobs.repository import BuildJobRepository, JobTransitionError
+from research_data_builder.jobs.repository import (
+    BuildJobRepository,
+    JobTransitionError,
+    UserBuildLimitError,
+)
 from research_data_builder.provenance import compare_builds
 from research_data_builder.providers.errors import ProviderConfigurationError, ProviderError
 from research_data_builder.providers.registry import ProviderRegistry
@@ -76,6 +81,7 @@ class BuildJobResource(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     cancel_requested_at: datetime | None = None
+    force_refresh: bool = False
     error_code: str | None = None
     error_message: str | None = None
 
@@ -143,9 +149,22 @@ def job_resource(job: BuildJob) -> BuildJobResource:
         started_at=job.started_at,
         finished_at=job.finished_at,
         cancel_requested_at=job.cancel_requested_at,
+        force_refresh=bool(job.force_refresh),
         error_code=job.error_code,
         error_message=job.error_message,
     )
+
+
+def enforce_recipe_size(definition: RecipeDefinition, settings: Settings) -> None:
+    size = len(RecipeCodec.to_json(definition).encode("utf-8"))
+    if size > settings.max_recipe_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "code": "recipe_size_limit",
+                "message": f"recipe uses {size} bytes; limit is {settings.max_recipe_bytes}",
+            },
+        )
 
 
 @router.post("/recipes", response_model=RecipeResource, status_code=status.HTTP_201_CREATED)
@@ -155,8 +174,10 @@ async def create_recipe(
     user: AuthenticatedUser,
 ) -> RecipeResource:
     database: Database = request.app.state.database
+    enforce_recipe_size(definition, request.app.state.settings)
     async with database.session() as session, session.begin():
         recipe = await RecipeRepository(session).create(user.id, definition)
+        await AuditRepository(session).record(user.id, "recipe.created", "recipe", recipe.id)
         return recipe_resource(recipe)
 
 
@@ -208,6 +229,7 @@ async def update_recipe(
     user: AuthenticatedUser,
 ) -> RecipeResource:
     database: Database = request.app.state.database
+    enforce_recipe_size(definition, request.app.state.settings)
     async with database.session() as session, session.begin():
         service = RecipeService(
             RecipeRepository(session), RecipeVersionRepository(session), user.id
@@ -216,6 +238,7 @@ async def update_recipe(
             recipe = await service.update(recipe_id, definition)
         except RecipeNotFoundError as error:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        await AuditRepository(session).record(user.id, "recipe.updated", "recipe", recipe.id)
         return recipe_resource(recipe)
 
 
@@ -241,6 +264,14 @@ async def freeze_recipe(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
         if not result.created:
             response.status_code = status.HTTP_200_OK
+        else:
+            await AuditRepository(session).record(
+                user.id,
+                "recipe.version_created",
+                "recipe_version",
+                result.version.id,
+                details={"version_number": result.version.version_number},
+            )
         return version_resource(result.version)
 
 
@@ -325,6 +356,10 @@ async def plan_build(
         result = await BuildRepository(session).create_or_get(user.id, version.id, plan)
         if not result.created:
             response.status_code = status.HTTP_200_OK
+        else:
+            await AuditRepository(session).record(
+                user.id, "build.planned", "build", result.build.id
+            )
         return build_resource(result.build)
 
 
@@ -366,6 +401,13 @@ async def retry_build(
                     "status": error.current.value,
                 },
             ) from error
+        await AuditRepository(session).record(
+            user.id,
+            "build.retry_created",
+            "build",
+            retry.id,
+            details={"source_build_id": str(build.id), "attempt": retry.attempt_number},
+        )
         return build_resource(retry)
 
 
@@ -378,6 +420,7 @@ async def execute_build(
     build_id: UUID,
     request: Request,
     user: AuthenticatedUser,
+    refresh_provider_inputs: bool = Query(default=False),
 ) -> BuildJobResource:
     database: Database = request.app.state.database
     async with database.session() as session, session.begin():
@@ -385,7 +428,11 @@ async def execute_build(
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
         try:
-            result = await BuildJobRepository(session).enqueue(build)
+            result = await BuildJobRepository(session).enqueue(
+                build,
+                force_refresh=refresh_provider_inputs,
+                max_outstanding=request.app.state.settings.max_outstanding_builds_per_user,
+            )
         except LookupError as error:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="build not found"
@@ -399,6 +446,19 @@ async def execute_build(
                     "status": build.status.value,
                 },
             ) from error
+        except UserBuildLimitError as error:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"code": "user_build_limit", "message": str(error)},
+            ) from error
+        if result.created:
+            await AuditRepository(session).record(
+                user.id,
+                "build.queued",
+                "build",
+                build.id,
+                details={"refresh_provider_inputs": refresh_provider_inputs},
+            )
         return job_resource(result.job)
 
 
@@ -440,6 +500,13 @@ async def cancel_build(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={"code": "build_not_cancellable", "message": str(error)},
             ) from error
+        await AuditRepository(session).record(
+            user.id,
+            "build.cancellation_requested",
+            "build",
+            build_id,
+            details={"job_status": job.status.value},
+        )
         return job_resource(job)
 
 
@@ -532,6 +599,14 @@ async def download_export(
     if hashlib.sha256(path.read_bytes()).hexdigest() != export.sha256:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="artifact checksum mismatch"
+        )
+    async with database.session() as session, session.begin():
+        await AuditRepository(session).record(
+            user.id,
+            "export.downloaded",
+            "export",
+            export.id,
+            details={"name": export.name},
         )
     return FileResponse(path, filename=export.name)
 

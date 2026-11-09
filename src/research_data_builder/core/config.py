@@ -33,11 +33,14 @@ class Settings(BaseSettings):
     fred_api_key: SecretStr | None = None
     provider_http_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
     provider_http_max_attempts: int = Field(default=3, ge=1, le=10)
+    provider_cache_ttl_hours: int = Field(default=24, ge=1, le=24 * 30)
     artifact_root: Path = Path("artifacts")
     session_cookie_name: str = Field(default="research_data_session", min_length=1, max_length=64)
     session_ttl_hours: int = Field(default=168, ge=1, le=24 * 90)
     worker_poll_seconds: float = Field(default=1.0, gt=0, le=60)
     worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
+    max_outstanding_builds_per_user: int = Field(default=5, ge=1, le=100)
+    max_recipe_bytes: int = Field(default=65536, ge=1024, le=1048576)
 
     @field_validator("log_level")
     @classmethod

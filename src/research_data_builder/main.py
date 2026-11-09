@@ -5,10 +5,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
+from research_data_builder.api.audit import router as audit_router
 from research_data_builder.api.auth import router as auth_router
 from research_data_builder.api.health import router as health_router
 from research_data_builder.api.recipes import router as recipe_router
+from research_data_builder.api.ui import WEB_ROOT
+from research_data_builder.api.ui import router as ui_router
 from research_data_builder.core.config import Settings, get_settings
 from research_data_builder.core.logging import configure_logging
 from research_data_builder.db.session import Database, DatabaseLifecycle
@@ -52,7 +56,10 @@ def create_app(
     application.state.provider_registry = resolved_registry
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(audit_router)
     application.include_router(recipe_router)
+    application.include_router(ui_router)
+    application.mount("/static", StaticFiles(directory=WEB_ROOT), name="static")
 
     logger.info(
         "application configured",

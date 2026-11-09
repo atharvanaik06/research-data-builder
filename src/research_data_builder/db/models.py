@@ -96,6 +96,7 @@ class User(Base):
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user")
     recipes: Mapped[list["DatasetRecipe"]] = relationship(back_populates="owner")
     build_runs: Mapped[list["BuildRun"]] = relationship(back_populates="owner")
+    audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
 
 
 class UserSession(Base):
@@ -119,6 +120,29 @@ class UserSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="sessions")
+
+
+class AuditEvent(Base):
+    """One immutable user or worker action for private research."""
+
+    __tablename__ = "audit_events"
+    __table_args__ = (
+        Index("ix_audit_events_user_created", "user_id", "created_at"),
+        CheckConstraint("length(action) > 0", name="audit_action_not_empty"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    actor: Mapped[str] = mapped_column(String(16))
+    action: Mapped[str] = mapped_column(String(64))
+    resource_type: Mapped[str] = mapped_column(String(32))
+    resource_id: Mapped[UUID | None] = mapped_column()
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="audit_events")
 
 
 class Series(Base):
@@ -488,6 +512,9 @@ class BuildJob(Base):
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    force_refresh: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -518,8 +545,43 @@ class BuildInput(Base):
     request: Mapped[dict[str, Any]] = mapped_column(JSON)
     indicator_metadata: Mapped[dict[str, Any]] = mapped_column(JSON)
     indicator_fingerprint: Mapped[str] = mapped_column(String(64))
+    cache_entry_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("provider_input_cache.id", ondelete="RESTRICT")
+    )
+    cache_status: Mapped[str | None] = mapped_column(String(16))
+    retrieved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     build_run: Mapped[BuildRun] = relationship(back_populates="inputs")
+    cache_entry: Mapped["ProviderInputCache | None"] = relationship()
+
+
+class ProviderInputCache(Base):
+    """One immutable normalized response for one provider request."""
+
+    __tablename__ = "provider_input_cache"
+    __table_args__ = (
+        CheckConstraint("length(request_key) = 64", name="provider_cache_request_key_length"),
+        CheckConstraint(
+            "length(response_fingerprint) = 64",
+            name="provider_cache_response_fingerprint_length",
+        ),
+        CheckConstraint("observation_count >= 0", name="provider_cache_count_nonnegative"),
+        CheckConstraint("hit_count >= 0", name="provider_cache_hits_nonnegative"),
+        Index("ix_provider_input_cache_lookup", "request_key", "expires_at", "retrieved_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    request_key: Mapped[str] = mapped_column(String(64))
+    provider: Mapped[str] = mapped_column(String(32))
+    indicator_id: Mapped[str] = mapped_column(String(128))
+    request: Mapped[dict[str, Any]] = mapped_column(JSON)
+    observations: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    response_fingerprint: Mapped[str] = mapped_column(String(64))
+    observation_count: Mapped[int] = mapped_column(Integer)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    hit_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
 
 
 class DatasetValidationResult(Base):

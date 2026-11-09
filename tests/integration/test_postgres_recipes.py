@@ -14,6 +14,7 @@ from sqlalchemy import delete
 from research_data_builder.artifacts import export_research_bundle
 from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
 from research_data_builder.db.models import (
+    AuditEvent,
     BuildInput,
     BuildJob,
     BuildLineage,
@@ -23,6 +24,7 @@ from research_data_builder.db.models import (
     DatasetValidationResult,
     ExportArtifact,
     JobStatus,
+    ProviderInputCache,
     RecipeVariable,
     RecipeVersion,
     TransformationStep,
@@ -90,11 +92,13 @@ class FixtureConnector:
 async def clear_recipes(database: Database) -> None:
     async with database.session() as session, session.begin():
         for model in (
+            AuditEvent,
             ExportArtifact,
             BuildLineage,
             DatasetValidationResult,
             BuildJob,
             BuildInput,
+            ProviderInputCache,
             BuildRun,
             TransformationStep,
             RecipeVariable,

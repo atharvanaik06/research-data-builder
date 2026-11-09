@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from research_data_builder.db.models import BuildJob, BuildRun, BuildStatus, JobStatus
@@ -16,6 +16,10 @@ class JobTransitionError(ValueError):
 
 class JobCancellationRequested(RuntimeError):
     """The user requested cancellation of a running job."""
+
+
+class UserBuildLimitError(ValueError):
+    """The user has too many queued or running builds."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +36,13 @@ class BuildJobRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def enqueue(self, build: BuildRun) -> EnqueuedJobResult:
+    async def enqueue(
+        self,
+        build: BuildRun,
+        *,
+        force_refresh: bool = False,
+        max_outstanding: int | None = None,
+    ) -> EnqueuedJobResult:
         locked_build = await self.session.scalar(
             select(BuildRun).where(BuildRun.id == build.id).with_for_update()
         )
@@ -44,6 +54,12 @@ class BuildJobRepository:
             return EnqueuedJobResult(existing, False)
         if build.status is not BuildStatus.PLANNED:
             raise JobTransitionError(f"build status must be planned, not {build.status.value}")
+        if max_outstanding is not None:
+            outstanding = await self.count_outstanding(build.owner_id)
+            if outstanding >= max_outstanding:
+                raise UserBuildLimitError(
+                    f"user has {outstanding} queued or running builds; limit is {max_outstanding}"
+                )
         build.status = BuildStatus.QUEUED
         job = BuildJob(
             build_run_id=build.id,
@@ -51,11 +67,23 @@ class BuildJobRepository:
             progress="queued",
             attempt_count=0,
             max_attempts=3,
+            force_refresh=force_refresh,
             available_at=datetime.now(UTC),
         )
         self.session.add(job)
         await self.session.flush()
         return EnqueuedJobResult(job, True)
+
+    async def count_outstanding(self, owner_id: UUID) -> int:
+        count = await self.session.scalar(
+            select(func.count(BuildJob.id))
+            .join(BuildRun, BuildRun.id == BuildJob.build_run_id)
+            .where(
+                BuildRun.owner_id == owner_id,
+                BuildJob.status.in_({JobStatus.QUEUED, JobStatus.RUNNING}),
+            )
+        )
+        return int(count or 0)
 
     async def get(self, job_id: UUID) -> BuildJob | None:
         return await self.session.scalar(select(BuildJob).where(BuildJob.id == job_id))

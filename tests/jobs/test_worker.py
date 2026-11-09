@@ -235,7 +235,7 @@ async def test_worker_completes_requested_cancellation() -> None:
         poll_seconds=0.01,
     )
 
-    await worker._record_cancellation(job.id)
+    await worker._record_cancellation(job.id, build.owner_id)
 
     assert job.status is JobStatus.CANCELLED
     assert job.progress == "cancelled"

@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
+from research_data_builder.audit import AuditRepository
 from research_data_builder.core.config import Settings, get_settings
 from research_data_builder.core.logging import configure_logging
 from research_data_builder.db.build_repositories import BuildRepository
@@ -88,7 +89,7 @@ class BuildWorker:
                 await cancellation
             await execution
         except JobCancellationRequested:
-            await self._record_cancellation(job_id)
+            await self._record_cancellation(job_id, owner_id)
         except BuildJobExecutionError as error:
             await self._record_expected_failure(job_id, build_id, owner_id, error)
         except Exception as error:
@@ -97,6 +98,9 @@ class BuildWorker:
         else:
             async with self.database.session() as session, session.begin():
                 await BuildJobRepository(session).succeed(job_id, self.worker_id)
+                await AuditRepository(session).record(
+                    owner_id, "build.succeeded", "build", build_id, actor="worker"
+                )
         finally:
             stop_heartbeat.set()
             await heartbeat
@@ -117,6 +121,14 @@ class BuildWorker:
                 error_code=error.code,
                 error_message=str(error),
             )
+            await AuditRepository(session).record(
+                owner_id,
+                "build.failed",
+                "build",
+                build_id,
+                actor="worker",
+                details={"error_code": error.code, "retryable": error.retryable},
+            )
             if not error.retryable:
                 return
             builds = BuildRepository(session)
@@ -128,8 +140,17 @@ class BuildWorker:
             retry = await builds.create_retry(failed_build)
             queued = await jobs.enqueue(retry)
             queued.job.max_attempts = failed_job.max_attempts
+            queued.job.force_refresh = failed_job.force_refresh
             delay = min(60, 5 * (2 ** (retry.attempt_number - 2)))
             queued.job.available_at = datetime.now(UTC) + timedelta(seconds=delay)
+            await AuditRepository(session).record(
+                owner_id,
+                "build.retry_scheduled",
+                "build",
+                retry.id,
+                actor="worker",
+                details={"source_build_id": str(build_id), "delay_seconds": delay},
+            )
 
     async def run_forever(self) -> None:
         while True:
@@ -158,9 +179,16 @@ class BuildWorker:
                 if not active:
                     return
 
-    async def _record_cancellation(self, job_id: UUID) -> None:
+    async def _record_cancellation(self, job_id: UUID, owner_id: UUID) -> None:
         async with self.database.session() as session, session.begin():
-            await BuildJobRepository(session).complete_cancellation(job_id, self.worker_id)
+            job = await BuildJobRepository(session).complete_cancellation(job_id, self.worker_id)
+            await AuditRepository(session).record(
+                owner_id,
+                "build.cancelled",
+                "build",
+                job.build_run_id,
+                actor="worker",
+            )
 
     async def _record_unexpected_failure(
         self,
@@ -187,6 +215,14 @@ class BuildWorker:
                 self.worker_id,
                 error_code="unexpected_worker_error",
                 error_message=str(error),
+            )
+            await AuditRepository(session).record(
+                owner_id,
+                "build.failed",
+                "build",
+                build_id,
+                actor="worker",
+                details={"error_code": "unexpected_worker_error"},
             )
 
 

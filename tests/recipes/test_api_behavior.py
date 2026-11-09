@@ -19,6 +19,7 @@ from research_data_builder.api.recipes import (
     compare_build_resources,
     create_recipe,
     download_export,
+    enforce_recipe_size,
     execute_build,
     export_recipe_version,
     freeze_recipe,
@@ -298,7 +299,7 @@ async def test_build_api_queues_and_returns_background_job() -> None:
         attempt_number=1,
         plan=plan.as_dict(),
     )
-    queue_session = session_with(build, build, None)
+    queue_session = session_with(build, build, None, 0)
 
     queued = await execute_build(
         build.id,
@@ -382,6 +383,45 @@ async def test_build_api_cancels_owned_queued_job() -> None:
     assert response.status == "cancelled"
     assert response.progress == "cancelled"
     assert build.status is BuildStatus.CANCELLED
+
+
+@pytest.mark.anyio
+async def test_build_api_enforces_user_outstanding_job_limit() -> None:
+    version, plan = version_and_plan()
+    build = BuildRun(
+        id=uuid4(),
+        owner_id=TEST_USER.id,
+        recipe_version_id=version.id,
+        status=BuildStatus.PLANNED,
+        build_identity=plan.build_identity,
+        attempt_number=1,
+        plan=plan.as_dict(),
+    )
+    session = session_with(build, build, None, 5)
+
+    with pytest.raises(HTTPException) as limited:
+        await execute_build(
+            build.id,
+            api_request(FakeApiDatabase(session)),
+            TEST_USER,
+        )
+
+    assert limited.value.status_code == 429
+    assert cast(dict[str, str], limited.value.detail)["code"] == "user_build_limit"
+
+
+def test_recipe_size_limit_rejects_large_valid_definition() -> None:
+    payload = valid_recipe()
+    payload["description"] = "x" * 1000
+    definition = RecipeDefinition.model_validate(payload)
+
+    with pytest.raises(HTTPException) as limited:
+        enforce_recipe_size(
+            definition,
+            Settings(max_recipe_bytes=1024, _env_file=None),  # type: ignore[call-arg]
+        )
+
+    assert limited.value.status_code == 413
 
 
 @pytest.mark.anyio
@@ -513,7 +553,7 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
     response = await download_export(
         export.id,
         api_request(
-            FakeApiDatabase(session_with(export)),
+            FakeApiDatabase(session_with(export), session_with()),
             settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
         ),
         TEST_USER,

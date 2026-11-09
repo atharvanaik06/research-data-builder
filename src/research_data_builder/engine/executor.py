@@ -1,5 +1,6 @@
 """Execute a resolved build plan into one deterministic research table."""
 
+from collections.abc import Awaitable, Callable
 from datetime import date
 from typing import cast
 
@@ -14,8 +15,10 @@ from research_data_builder.engine.transform import apply_transformations
 from research_data_builder.providers.domain import (
     DataProvider,
     Frequency,
+    Observation,
     ObservationQuery,
 )
+from research_data_builder.providers.protocol import ProviderConnector
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.recipes.planner import BuildPlan, ResolvedBuildInput
 from research_data_builder.recipes.schemas import (
@@ -23,12 +26,21 @@ from research_data_builder.recipes.schemas import (
     TransformationOperation,
 )
 
+ObservationLoader = Callable[
+    [str, ProviderConnector, ObservationQuery], Awaitable[list[Observation]]
+]
+
 
 class BuildExecutor:
     """Retrieve normalized inputs and execute recipe-declared table operations."""
 
-    def __init__(self, providers: ProviderRegistry) -> None:
+    def __init__(
+        self,
+        providers: ProviderRegistry,
+        observation_loader: ObservationLoader | None = None,
+    ) -> None:
         self.providers = providers
+        self.observation_loader = observation_loader
 
     async def execute(self, version: RecipeVersion, plan: BuildPlan) -> ExecutionResult:
         if str(version.id) != plan.recipe_version_id:
@@ -66,7 +78,10 @@ class BuildExecutor:
             start_date=date.fromisoformat(str(request["start_date"])),
             end_date=date.fromisoformat(str(request["end_date"])),
         )
-        observations = await connector.get_observations(query)
+        if self.observation_loader is None:
+            observations = await connector.get_observations(query)
+        else:
+            observations = await self.observation_loader(item.output_name, connector, query)
         frame = observations_to_long(observations, output_name=item.output_name)
         frame = self._bound_frame(frame, definition, connector.capabilities.geographic_filtering)
 

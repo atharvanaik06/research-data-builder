@@ -13,7 +13,10 @@ from research_data_builder.db.session import Database
 from research_data_builder.engine.executor import BuildExecutor
 from research_data_builder.engine.harmonize import HarmonizationError
 from research_data_builder.jobs.repository import BuildJobRepository
+from research_data_builder.providers.cache import ProviderObservationCache
+from research_data_builder.providers.domain import Observation, ObservationQuery
 from research_data_builder.providers.errors import ProviderError, ProviderRequestError
+from research_data_builder.providers.protocol import ProviderConnector
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.recipes.planner import BuildPlan
 from research_data_builder.recipes.schemas import RecipeDefinition
@@ -69,11 +72,36 @@ class BuildJobExecutor:
             version = await RecipeVersionRepository(session).get(build.recipe_version_id, owner_id)
             if version is None:
                 raise BuildJobExecutionError("version_unavailable", "recipe version does not exist")
+            job = await BuildJobRepository(session).get_for_build(build_id, owner_id)
+            force_refresh = job.force_refresh if job is not None else False
 
         await progress("retrieving")
         try:
             plan = BuildPlan.from_dict(build.plan)
-            result = await BuildExecutor(self.registry).execute(version, plan)
+            if job is None:
+                result = await BuildExecutor(self.registry).execute(version, plan)
+            else:
+                cache = ProviderObservationCache(
+                    self.database,
+                    ttl_hours=self.settings.provider_cache_ttl_hours,
+                )
+
+                async def load_observations(
+                    output_name: str,
+                    connector: ProviderConnector,
+                    query: ObservationQuery,
+                ) -> list[Observation]:
+                    return await cache.load(
+                        build_id,
+                        output_name,
+                        connector,
+                        query,
+                        force_refresh=force_refresh,
+                    )
+
+                result = await BuildExecutor(self.registry, load_observations).execute(
+                    version, plan
+                )
         except ProviderRequestError as error:
             await self._fail_build(build_id, owner_id, "execution_failed", str(error))
             raise BuildJobExecutionError(

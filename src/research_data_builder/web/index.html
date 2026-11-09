@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build checked and repeatable research datasets from public economic APIs.">
+  <title>Research Data Builder</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/app" aria-label="Research Data Builder home">
+        <span class="brand-mark">R</span>
+        <span>Research Data Builder</span>
+      </a>
+      <div class="account">
+        <span id="account-email"></span>
+        <button id="logout-button" class="text-button" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="auth-view" class="auth-layout">
+        <div class="hero-copy">
+          <p class="eyebrow">REPRODUCIBLE ECONOMIC DATA</p>
+          <h1>Spend less time cleaning data.</h1>
+          <p class="hero-text">Select public indicators once. The system builds a checked dataset with citations, lineage, and a repeatable recipe.</p>
+          <ol class="value-list">
+            <li><strong>Define</strong><span>Choose indicators, countries, dates, and output rules.</span></li>
+            <li><strong>Build</strong><span>Workers retrieve, normalize, join, and validate the data.</span></li>
+            <li><strong>Prove</strong><span>Download data with its codebook, sources, and checksums.</span></li>
+          </ol>
+        </div>
+        <form id="auth-form" class="panel auth-panel">
+          <div>
+            <p class="eyebrow">RESEARCH WORKSPACE</p>
+            <h2 id="auth-title">Sign in</h2>
+          </div>
+          <label>Email<input id="auth-email" type="email" autocomplete="email" required></label>
+          <label>Password<input id="auth-password" type="password" minlength="12" autocomplete="current-password" required></label>
+          <button id="auth-submit" class="primary-button" type="submit">Sign in</button>
+          <button id="auth-mode" class="text-button" type="button">Create a new account</button>
+          <p id="auth-error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="workspace-view" class="workspace" hidden>
+        <aside class="sidebar">
+          <div class="sidebar-heading">
+            <div><p class="eyebrow">YOUR WORK</p><h2>Recipes</h2></div>
+            <button id="new-recipe" class="icon-button" type="button" aria-label="New recipe">+</button>
+          </div>
+          <div id="recipe-list" class="recipe-list"></div>
+          <button id="show-audit" class="secondary-button full" type="button">View activity</button>
+        </aside>
+
+        <div class="content">
+          <div class="page-heading">
+            <div><p class="eyebrow">DATASET RECIPE</p><h1>Build a research dataset</h1></div>
+            <span id="save-status" class="status-chip">New draft</span>
+          </div>
+
+          <form id="recipe-form" class="form-stack">
+            <section class="panel section-panel">
+              <div class="section-heading"><span class="step-number">1</span><div><h2>Research question</h2><p>Name the dataset and select its time range.</p></div></div>
+              <div class="field-grid">
+                <label class="wide">Dataset name<input id="recipe-name" required maxlength="255" value="European growth panel"></label>
+                <label class="wide">Description<textarea id="recipe-description" rows="2" maxlength="1000">Annual growth indicators for selected European economies.</textarea></label>
+                <label>Start date<input id="start-date" type="date" required value="2015-01-01"></label>
+                <label>End date<input id="end-date" type="date" required value="2025-12-31"></label>
+                <label>Output frequency<select id="frequency"><option value="annual">Annual</option><option value="quarterly">Quarterly</option><option value="monthly">Monthly</option></select></label>
+                <label>Countries <span class="hint">ISO3, comma separated</span><input id="entities" value="CZE, DEU, FRA, POL"></label>
+              </div>
+            </section>
+
+            <section class="panel section-panel">
+              <div class="section-heading with-action"><span class="step-number">2</span><div><h2>Variables</h2><p>Add each public indicator that the dataset needs.</p></div><button id="add-variable" class="secondary-button" type="button">Add variable</button></div>
+              <div class="variable-header" aria-hidden="true"><span>Provider</span><span>Indicator ID</span><span>Output column</span><span></span></div>
+              <div id="variables" class="variable-list"></div>
+            </section>
+
+            <section class="panel section-panel">
+              <div class="section-heading"><span class="step-number">3</span><div><h2>Output rules</h2><p>Choose how the system joins and exports the variables.</p></div></div>
+              <div class="field-grid">
+                <label>Join type<select id="join-type"><option value="outer">Outer join</option><option value="inner">Inner join</option><option value="left">Left join</option></select></label>
+                <label>Missing values<select id="missing-values"><option value="preserve">Preserve</option><option value="drop_rows">Drop rows</option></select></label>
+                <label class="check-label"><input id="format-csv" type="checkbox" checked>CSV</label>
+                <label class="check-label"><input id="format-parquet" type="checkbox" checked>Parquet</label>
+              </div>
+            </section>
+
+            <div class="build-bar">
+              <label class="check-label refresh"><input id="force-refresh" type="checkbox">Request fresh provider data</label>
+              <button id="build-button" class="primary-button" type="submit">Save and build dataset</button>
+            </div>
+          </form>
+
+          <section id="build-panel" class="panel build-panel" hidden>
+            <div class="build-heading"><div><p class="eyebrow">BUILD STATUS</p><h2 id="build-title">Preparing build</h2></div><span id="build-status" class="status-chip">planned</span></div>
+            <div class="progress-track"><div id="progress-fill"></div></div>
+            <p id="build-message">The system is preparing the recipe.</p>
+            <div class="action-row"><button id="cancel-build" class="danger-button" type="button">Cancel build</button><button id="retry-build" class="secondary-button" type="button" hidden>Retry build</button></div>
+          </section>
+
+          <section id="results-panel" class="results" hidden>
+            <div class="result-tabs" role="tablist" aria-label="Build results">
+              <button class="tab active" type="button" data-panel="preview-result">Preview</button>
+              <button class="tab" type="button" data-panel="validation-result">Validation</button>
+              <button class="tab" type="button" data-panel="exports-result">Downloads</button>
+            </div>
+            <div id="preview-result" class="panel result-panel"></div>
+            <div id="validation-result" class="panel result-panel" hidden></div>
+            <div id="exports-result" class="panel result-panel" hidden></div>
+          </section>
+
+          <section id="audit-panel" class="panel audit-panel" hidden>
+            <div class="build-heading"><div><p class="eyebrow">PRIVATE HISTORY</p><h2>Workspace activity</h2></div><button id="close-audit" class="text-button" type="button">Close</button></div>
+            <div id="audit-list"></div>
+          </section>
+          <p id="workspace-error" class="error" role="alert"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
