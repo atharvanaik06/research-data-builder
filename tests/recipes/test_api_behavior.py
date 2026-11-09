@@ -3,6 +3,7 @@
 import hashlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -22,8 +23,8 @@ from research_data_builder.api.recipes import (
     freeze_recipe,
     get_build,
     get_build_exports,
+    get_build_job,
     get_build_lineage,
-    get_build_preview,
     get_build_validation,
     get_recipe,
     get_recipe_version,
@@ -37,6 +38,7 @@ from research_data_builder.api.recipes import (
 from research_data_builder.core.config import Settings
 from research_data_builder.db.models import (
     BuildInput,
+    BuildJob,
     BuildLineage,
     BuildRun,
     BuildStatus,
@@ -56,7 +58,7 @@ from research_data_builder.providers import (
 )
 from research_data_builder.recipes.codec import canonical_recipe_hash
 from research_data_builder.recipes.schemas import RecipeDefinition
-from tests.engine.test_executor import ObservationConnector, version_and_plan
+from tests.engine.test_executor import version_and_plan
 from tests.recipes.test_schemas import valid_recipe
 
 TEST_USER = User(
@@ -86,6 +88,8 @@ def session_with(*scalar_values: object) -> MagicMock:
     def assign_id(model: Any) -> None:
         if hasattr(model, "id") and model.id is None:
             model.id = uuid4()
+        if isinstance(model, BuildJob) and model.created_at is None:
+            model.created_at = datetime.now(UTC)
 
     session.add.side_effect = assign_id
     return session
@@ -281,7 +285,7 @@ async def test_build_api_resolves_persists_reuses_and_reads_plans() -> None:
 
 
 @pytest.mark.anyio
-async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) -> None:
+async def test_build_api_queues_and_returns_background_job() -> None:
     version, plan = version_and_plan()
     build = BuildRun(
         id=uuid4(),
@@ -292,56 +296,57 @@ async def test_build_api_executes_and_exposes_bounded_preview(tmp_path: Path) ->
         attempt_number=1,
         plan=plan.as_dict(),
     )
-    registry = ProviderRegistry([cast(ProviderConnector, ObservationConnector())])
-    database = FakeApiDatabase(
-        session_with(build, version),
-        session_with(build),
-        session_with(build),
-    )
+    queue_session = session_with(build, build, None)
 
-    executed = await execute_build(
+    queued = await execute_build(
         build.id,
-        api_request(
-            database,
-            registry=registry,
-            settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
-        ),
+        api_request(FakeApiDatabase(queue_session)),
         TEST_USER,
-        preview_limit=1,
     )
 
-    assert executed.status == "succeeded"
-    assert executed.dataset_checksum is not None
-    assert executed.row_count == 2
-    assert build.preview is not None
-    assert build.preview["truncated"] is True
+    assert queued.status == "queued"
+    assert queued.progress == "queued"
+    assert queued.attempt_count == 0
+    assert build.status is BuildStatus.QUEUED
 
+    stored_job = next(
+        call.args[0]
+        for call in queue_session.add.call_args_list
+        if isinstance(call.args[0], BuildJob)
+    )
+    fetched = await get_build_job(
+        build.id,
+        api_request(FakeApiDatabase(session_with(stored_job))),
+        TEST_USER,
+    )
+    assert fetched.id == queued.id
+
+    duplicate = await execute_build(
+        build.id,
+        api_request(FakeApiDatabase(session_with(build, build, stored_job))),
+        TEST_USER,
+    )
+    assert duplicate.id == queued.id
+
+    completed = BuildRun(
+        id=uuid4(),
+        owner_id=TEST_USER.id,
+        recipe_version_id=version.id,
+        status=BuildStatus.SUCCEEDED,
+        build_identity=plan.build_identity,
+        attempt_number=2,
+        plan=plan.as_dict(),
+    )
     with pytest.raises(HTTPException) as immutable:
         await execute_build(
-            build.id,
-            api_request(
-                FakeApiDatabase(
-                    session_with(build, version),
-                    session_with(None, build),
-                ),
-                registry=registry,
-                settings=Settings(artifact_root=tmp_path, _env_file=None),  # type: ignore[call-arg]
-            ),
+            completed.id,
+            api_request(FakeApiDatabase(session_with(completed, completed, None))),
             TEST_USER,
-            preview_limit=1,
         )
     assert immutable.value.status_code == 409
     detail = cast(dict[str, object], immutable.value.detail)
     assert detail["code"] == "build_not_executable"
     assert detail["status"] == "succeeded"
-
-    preview = await get_build_preview(
-        build.id,
-        api_request(FakeApiDatabase(session_with(build))),
-        TEST_USER,
-    )
-    assert preview.preview_row_count == 1
-    assert preview.total_row_count == 2
 
 
 @pytest.mark.anyio

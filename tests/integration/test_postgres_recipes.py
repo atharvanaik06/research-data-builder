@@ -15,12 +15,14 @@ from research_data_builder.artifacts import export_research_bundle
 from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
 from research_data_builder.db.models import (
     BuildInput,
+    BuildJob,
     BuildLineage,
     BuildRun,
     BuildStatus,
     DatasetRecipe,
     DatasetValidationResult,
     ExportArtifact,
+    JobStatus,
     RecipeVariable,
     RecipeVersion,
     TransformationStep,
@@ -31,6 +33,7 @@ from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
 from research_data_builder.db.session import Database
 from research_data_builder.engine.executor import BuildExecutor
+from research_data_builder.jobs.repository import BuildJobRepository
 from research_data_builder.providers import (
     DataProvider,
     Frequency,
@@ -90,6 +93,7 @@ async def clear_recipes(database: Database) -> None:
             ExportArtifact,
             BuildLineage,
             DatasetValidationResult,
+            BuildJob,
             BuildInput,
             BuildRun,
             TransformationStep,
@@ -153,10 +157,13 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                 assert second.created is False
                 assert second.build.id == first.build.id
                 build_id = first.build.id
+                queued = await BuildJobRepository(session).enqueue(first.build)
+                job_id = queued.job.id
 
             async with database.session() as session, session.begin():
-                claimed = await BuildRepository(session).claim_execution(build_id, owner_id)
-                assert claimed.status is BuildStatus.RETRIEVING
+                claimed_job = await BuildJobRepository(session).claim_next("worker-1", 60)
+                assert claimed_job is not None
+                assert claimed_job.id == job_id
 
             execution = await BuildExecutor(registry).execute(version, plan)
             validation = validate_dataset(execution, definition)
@@ -186,6 +193,7 @@ def test_postgres_freezes_versions_and_reuses_deterministic_builds() -> None:
                         bundle,
                         validation,
                     )
+                    await BuildJobRepository(session).succeed(job_id, "worker-1")
 
             async with database.session() as session:
                 stored_build = await BuildRepository(session).get(build_id, owner_id)
@@ -285,12 +293,23 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 session.add(second_export)
                 await session.flush()
                 second_export_id = second_export.id
+                queued = await BuildJobRepository(session).enqueue(second_build)
+                second_job_id = queued.job.id
 
             async with database.session() as session, session.begin():
                 builds = BuildRepository(session)
-                claimed = await builds.claim_execution(second_build_id, second_user_id)
+                claimed_job = await BuildJobRepository(session).claim_next("worker-2", 60)
+                assert claimed_job is not None
+                claimed = await builds.get(second_build_id, second_user_id)
+                assert claimed is not None
                 await builds.fail(
                     claimed,
+                    error_code="provider_timeout",
+                    error_message="temporary provider failure",
+                )
+                await BuildJobRepository(session).fail(
+                    second_job_id,
+                    "worker-2",
                     error_code="provider_timeout",
                     error_message="temporary provider failure",
                 )
@@ -305,12 +324,14 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 versions = RecipeVersionRepository(session)
                 builds = BuildRepository(session)
                 outputs = BuildOutputRepository(session)
+                jobs = BuildJobRepository(session)
 
                 assert [item.id for item in await recipes.list(first_user_id)] == [first_recipe_id]
                 assert await recipes.get(second_recipe_id, first_user_id) is None
                 assert await versions.get(second_version_id, first_user_id) is None
                 assert await builds.get(second_build_id, first_user_id) is None
                 assert await builds.get(retry_build_id, first_user_id) is None
+                assert await jobs.get_for_build(second_build_id, first_user_id) is None
                 assert await outputs.get_export(second_export_id, first_user_id) is None
 
                 assert await recipes.get(second_recipe_id, second_user_id) is not None
@@ -320,6 +341,9 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 assert stored_retry is not None
                 assert stored_retry.status is BuildStatus.PLANNED
                 assert stored_retry.attempt_number == 2
+                stored_job = await jobs.get_for_build(second_build_id, second_user_id)
+                assert stored_job is not None
+                assert stored_job.status is JobStatus.FAILED
                 assert await outputs.get_export(second_export_id, second_user_id) is not None
         finally:
             await clear_recipes(database)

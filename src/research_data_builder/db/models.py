@@ -1,6 +1,6 @@
 """SQLAlchemy models for append-only economic observation history."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -49,10 +49,20 @@ class BuildStatus(StrEnum):
     """Lifecycle states for a dataset build."""
 
     PLANNED = "planned"
+    QUEUED = "queued"
     RETRIEVING = "retrieving"
     TRANSFORMING = "transforming"
     VALIDATING = "validating"
     EXPORTING = "exporting"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class JobStatus(StrEnum):
+    """Lifecycle states for one background build job."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
 
@@ -437,6 +447,51 @@ class BuildRun(Base):
     )
     lineage: Mapped["BuildLineage | None"] = relationship(back_populates="build_run")
     exports: Mapped[list["ExportArtifact"]] = relationship(back_populates="build_run")
+    job: Mapped["BuildJob | None"] = relationship(back_populates="build_run")
+
+
+class BuildJob(Base):
+    """One durable background job for one immutable build attempt."""
+
+    __tablename__ = "build_jobs"
+    __table_args__ = (
+        UniqueConstraint("build_run_id", name="uq_build_jobs_build_run_id"),
+        CheckConstraint("attempt_count >= 0", name="build_job_attempt_count_nonnegative"),
+        CheckConstraint("max_attempts > 0", name="build_job_max_attempts_positive"),
+        Index("ix_build_jobs_claim", "status", "available_at", "created_at"),
+        Index("ix_build_jobs_lease_expires_at", "lease_expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    build_run_id: Mapped[UUID] = mapped_column(
+        ForeignKey("build_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(
+            JobStatus,
+            name="job_status",
+            native_enum=False,
+            create_constraint=True,
+            values_callable=enum_values,
+        ),
+        default=JobStatus.QUEUED,
+    )
+    progress: Mapped[str] = mapped_column(String(32), default="queued")
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), server_default=func.now()
+    )
+    lease_owner: Mapped[str | None] = mapped_column(String(128))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(String(512))
+
+    build_run: Mapped[BuildRun] = relationship(back_populates="job")
 
 
 class BuildInput(Base):

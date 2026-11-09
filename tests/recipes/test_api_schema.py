@@ -19,6 +19,8 @@ def test_recipe_and_build_routes_are_versioned_and_documented(app: FastAPI) -> N
     assert "/api/v1/recipe-versions/{version_id}/builds" in paths
     assert "/api/v1/builds/{build_id}" in paths
     assert "/api/v1/builds/{build_id}/execute" in paths
+    assert "/api/v1/builds/{build_id}/job" in paths
+    assert "202" in paths["/api/v1/builds/{build_id}/execute"]["post"]["responses"]
     assert "/api/v1/builds/{build_id}/preview" in paths
     assert "/api/v1/builds/{build_id}/validation" in paths
     assert "/api/v1/builds/{build_id}/lineage" in paths

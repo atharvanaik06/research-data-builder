@@ -1,6 +1,7 @@
 """Versioned recipe and deterministic build-plan HTTP API."""
 
 import hashlib
+from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -8,24 +9,21 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Res
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from research_data_builder.artifacts import export_research_bundle
 from research_data_builder.auth.dependencies import require_user
 from research_data_builder.core.config import Settings
 from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
-from research_data_builder.db.models import BuildRun, DatasetRecipe, RecipeVersion, User
+from research_data_builder.db.models import BuildJob, BuildRun, DatasetRecipe, RecipeVersion, User
 from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
 from research_data_builder.db.session import Database
-from research_data_builder.engine.executor import BuildExecutor
-from research_data_builder.engine.harmonize import HarmonizationError
+from research_data_builder.jobs.repository import BuildJobRepository, JobTransitionError
 from research_data_builder.provenance import compare_builds
 from research_data_builder.providers.errors import ProviderConfigurationError, ProviderError
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.recipes.codec import RecipeCodec
-from research_data_builder.recipes.planner import BuildPlan, BuildPlanner
+from research_data_builder.recipes.planner import BuildPlanner
 from research_data_builder.recipes.schemas import RecipeDefinition
 from research_data_builder.recipes.service import RecipeNotFoundError, RecipeService
-from research_data_builder.validation import validate_dataset
 
 router = APIRouter(prefix="/api/v1", tags=["recipes"])
 AuthenticatedUser = Annotated[User, Depends(require_user)]
@@ -66,6 +64,19 @@ class BuildPreviewResource(BaseModel):
     preview_row_count: int
     total_row_count: int
     truncated: bool
+
+
+class BuildJobResource(BaseModel):
+    id: UUID
+    build_id: UUID
+    status: str
+    progress: str
+    attempt_count: int
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error_code: str | None = None
+    error_message: str | None = None
 
 
 class ValidationIssueResource(BaseModel):
@@ -117,6 +128,21 @@ def build_resource(build: BuildRun) -> BuildResource:
         execution_summary=build.execution_summary,
         dataset_checksum=build.dataset_checksum,
         bundle_path=build.bundle_path,
+    )
+
+
+def job_resource(job: BuildJob) -> BuildJobResource:
+    return BuildJobResource(
+        id=job.id,
+        build_id=job.build_run_id,
+        status=job.status.value,
+        progress=job.progress,
+        attempt_count=job.attempt_count,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        error_code=job.error_code,
+        error_message=job.error_message,
     )
 
 
@@ -341,121 +367,51 @@ async def retry_build(
         return build_resource(retry)
 
 
-@router.post("/builds/{build_id}/execute", response_model=BuildResource)
+@router.post(
+    "/builds/{build_id}/execute",
+    response_model=BuildJobResource,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def execute_build(
     build_id: UUID,
     request: Request,
     user: AuthenticatedUser,
-    preview_limit: Annotated[int, Query(ge=1, le=1_000)] = 100,
-) -> BuildResource:
+) -> BuildJobResource:
     database: Database = request.app.state.database
-    registry: ProviderRegistry = request.app.state.provider_registry
-    async with database.session() as session:
+    async with database.session() as session, session.begin():
         build = await BuildRepository(session).get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        version = await RecipeVersionRepository(session).get(build.recipe_version_id, user.id)
-        if version is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="version is unavailable"
-            )
-
-    async with database.session() as session, session.begin():
         try:
-            await BuildRepository(session).claim_execution(build_id, user.id)
+            result = await BuildJobRepository(session).enqueue(build)
         except LookupError as error:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="build not found"
             ) from error
-        except BuildTransitionError as error:
+        except JobTransitionError as error:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "build_not_executable",
                     "message": str(error),
-                    "status": error.current.value,
+                    "status": build.status.value,
                 },
             ) from error
+        return job_resource(result.job)
 
-    try:
-        plan = BuildPlan.from_dict(build.plan)
-        result = await BuildExecutor(registry).execute(version, plan)
-    except (ProviderError, HarmonizationError, ValueError) as error:
-        async with database.session() as session, session.begin():
-            failed_build = await BuildRepository(session).get(build_id, user.id)
-            if failed_build is not None:
-                await BuildRepository(session).fail(
-                    failed_build,
-                    error_code="execution_failed",
-                    error_message=str(error),
-                )
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"code": "execution_failed", "message": str(error)},
-        ) from error
 
-    recipe = RecipeDefinition.model_validate(version.content)
-    validation = validate_dataset(result, recipe)
-    if not validation.passed:
-        async with database.session() as session, session.begin():
-            invalid_build = await BuildRepository(session).get(build_id, user.id)
-            if invalid_build is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-            await BuildRepository(session).record_execution(
-                invalid_build,
-                result,
-                preview_limit=preview_limit,
-            )
-            await BuildOutputRepository(session).record_validation_failure(
-                invalid_build, validation
-            )
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"code": "validation_failed", "validation": validation.as_dict()},
-        )
-
-    settings: Settings = request.app.state.settings
-    try:
-        bundle = export_research_bundle(
-            artifact_root=settings.artifact_root,
-            build_id=build_id,
-            build_identity=build.build_identity,
-            frame=result.frame,
-            recipe=recipe,
-            plan=plan,
-            validation=validation,
-            entity_mapping_version=result.entity_mapping_version,
-            application_version=settings.app_version,
-        )
-    except (OSError, ValueError) as error:
-        async with database.session() as session, session.begin():
-            failed_build = await BuildRepository(session).get(build_id, user.id)
-            if failed_build is not None:
-                await BuildRepository(session).fail(
-                    failed_build,
-                    error_code="export_failed",
-                    error_message=str(error),
-                )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"code": "export_failed"},
-        ) from error
-
-    async with database.session() as session, session.begin():
-        completed_build = await BuildRepository(session).get(build_id, user.id)
-        if completed_build is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        await BuildRepository(session).record_execution(
-            completed_build,
-            result,
-            preview_limit=preview_limit,
-        )
-        await BuildOutputRepository(session).record_success(
-            completed_build,
-            bundle,
-            validation,
-        )
-        return build_resource(completed_build)
+@router.get("/builds/{build_id}/job", response_model=BuildJobResource)
+async def get_build_job(
+    build_id: UUID,
+    request: Request,
+    user: AuthenticatedUser,
+) -> BuildJobResource:
+    database: Database = request.app.state.database
+    async with database.session() as session:
+        job = await BuildJobRepository(session).get_for_build(build_id, user.id)
+        if job is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+        return job_resource(job)
 
 
 @router.get("/builds/{build_id}/preview", response_model=BuildPreviewResource)
