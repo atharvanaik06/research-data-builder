@@ -1,5 +1,6 @@
 """FastAPI application factory and default ASGI application."""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,9 +14,11 @@ from research_data_builder.api.health import router as health_router
 from research_data_builder.api.recipes import router as recipe_router
 from research_data_builder.api.ui import WEB_ROOT
 from research_data_builder.api.ui import router as ui_router
+from research_data_builder.artifacts import ArtifactStorage, create_artifact_storage
 from research_data_builder.core.config import Settings, get_settings
 from research_data_builder.core.logging import configure_logging
 from research_data_builder.db.session import Database, DatabaseLifecycle
+from research_data_builder.jobs.worker import create_worker
 from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.providers.runtime import ProviderRuntime
 
@@ -26,6 +29,7 @@ def create_app(
     settings: Settings | None = None,
     database: DatabaseLifecycle | None = None,
     provider_registry: ProviderRegistry | None = None,
+    artifact_storage: ArtifactStorage | None = None,
 ) -> FastAPI:
     """Create a configured Research Data Builder application instance."""
     resolved_settings = settings or get_settings()
@@ -37,13 +41,37 @@ def create_app(
         resolved_registry = provider_runtime.registry
     else:
         resolved_registry = provider_registry
+    resolved_artifact_storage = artifact_storage or create_artifact_storage(resolved_settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        yield
-        if provider_runtime is not None:
-            await provider_runtime.close()
-        await resolved_database.dispose()
+        worker_stop: asyncio.Event | None = None
+        worker_task: asyncio.Task[None] | None = None
+        if resolved_settings.embedded_worker_enabled:
+            if not isinstance(resolved_database, Database):
+                raise TypeError("the embedded worker requires the concrete database service")
+            worker_stop = asyncio.Event()
+            worker = create_worker(
+                resolved_settings,
+                resolved_database,
+                resolved_registry,
+                resolved_artifact_storage,
+            )
+            worker_task = asyncio.create_task(
+                worker.run_until_stopped(worker_stop),
+                name="embedded-build-worker",
+            )
+            logger.info("embedded build worker started")
+        try:
+            yield
+        finally:
+            if worker_stop is not None and worker_task is not None:
+                worker_stop.set()
+                await worker_task
+                logger.info("embedded build worker stopped")
+            if provider_runtime is not None:
+                await provider_runtime.close()
+            await resolved_database.dispose()
 
     application = FastAPI(
         title="Research Data Builder API",
@@ -54,6 +82,7 @@ def create_app(
     application.state.settings = resolved_settings
     application.state.database = resolved_database
     application.state.provider_registry = resolved_registry
+    application.state.artifact_storage = resolved_artifact_storage
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(audit_router)

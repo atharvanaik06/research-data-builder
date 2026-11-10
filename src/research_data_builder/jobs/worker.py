@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
+from research_data_builder.artifacts import ArtifactStorage, create_artifact_storage
 from research_data_builder.audit import AuditRepository
 from research_data_builder.core.config import Settings, get_settings
 from research_data_builder.core.logging import configure_logging
@@ -21,6 +22,7 @@ from research_data_builder.jobs.repository import (
     BuildJobRepository,
     JobCancellationRequested,
 )
+from research_data_builder.providers.registry import ProviderRegistry
 from research_data_builder.providers.runtime import ProviderRuntime
 
 logger = logging.getLogger(__name__)
@@ -153,10 +155,15 @@ class BuildWorker:
             )
 
     async def run_forever(self) -> None:
-        while True:
+        await self.run_until_stopped(asyncio.Event())
+
+    async def run_until_stopped(self, stop: asyncio.Event) -> None:
+        """Process jobs until the application requests a graceful stop."""
+        while not stop.is_set():
             processed = await self.run_once()
             if not processed:
-                await asyncio.sleep(self.poll_seconds)
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), timeout=self.poll_seconds)
 
     async def _heartbeat_loop(
         self,
@@ -226,17 +233,33 @@ class BuildWorker:
             )
 
 
-async def run_worker(settings: Settings) -> None:
-    database = Database(settings.database_url)
-    runtime = ProviderRuntime(settings)
+def create_worker(
+    settings: Settings,
+    database: Database,
+    registry: ProviderRegistry,
+    artifact_storage: ArtifactStorage,
+) -> BuildWorker:
+    """Create one worker with the supplied process resources."""
     worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid4()}"
-    worker = BuildWorker(
+    return BuildWorker(
         database,
-        BuildJobExecutor(database, runtime.registry, settings),
+        BuildJobExecutor(
+            database,
+            registry,
+            settings,
+            artifact_storage,
+        ),
         worker_id=worker_id,
         lease_seconds=settings.worker_lease_seconds,
         poll_seconds=settings.worker_poll_seconds,
     )
+
+
+async def run_worker(settings: Settings) -> None:
+    database = Database(settings.database_url)
+    runtime = ProviderRuntime(settings)
+    artifact_storage = create_artifact_storage(settings)
+    worker = create_worker(settings, database, runtime.registry, artifact_storage)
     try:
         await worker.run_forever()
     finally:

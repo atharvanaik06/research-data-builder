@@ -36,6 +36,27 @@ async def test_worker_returns_when_queue_is_empty() -> None:
 
 
 @pytest.mark.anyio
+async def test_worker_loop_stops_during_empty_poll() -> None:
+    session = session_with(None)
+    no_expired = MagicMock()
+    no_expired.__iter__.return_value = iter([])
+    session.scalars.return_value = no_expired
+    worker = BuildWorker(
+        cast(Database, FakeApiDatabase(session)),
+        MagicMock(spec=BuildJobExecutor),
+        worker_id="embedded-worker",
+        lease_seconds=60,
+        poll_seconds=60,
+    )
+    stop = asyncio.Event()
+
+    task = asyncio.create_task(worker.run_until_stopped(stop))
+    await asyncio.sleep(0)
+    stop.set()
+    await asyncio.wait_for(task, timeout=1)
+
+
+@pytest.mark.anyio
 async def test_worker_claims_executes_and_completes_job() -> None:
     build = BuildRun(
         id=uuid4(),

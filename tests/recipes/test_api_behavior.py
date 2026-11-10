@@ -37,6 +37,7 @@ from research_data_builder.api.recipes import (
     retry_build,
     update_recipe,
 )
+from research_data_builder.artifacts import ArtifactStorage, create_artifact_storage
 from research_data_builder.core.config import Settings
 from research_data_builder.db.models import (
     BuildInput,
@@ -128,11 +129,14 @@ def api_request(
     *,
     registry: ProviderRegistry | None = None,
     settings: Settings | None = None,
+    artifact_storage: ArtifactStorage | None = None,
 ) -> Request:
+    resolved_settings = settings or Settings(_env_file=None)  # type: ignore[call-arg]
     state = SimpleNamespace(
         database=database,
         provider_registry=registry or ProviderRegistry([]),
-        settings=settings or Settings(_env_file=None),  # type: ignore[call-arg]
+        settings=resolved_settings,
+        artifact_storage=artifact_storage or create_artifact_storage(resolved_settings),
     )
     return cast(Request, SimpleNamespace(app=SimpleNamespace(state=state)))
 
@@ -558,7 +562,8 @@ async def test_output_apis_return_validation_lineage_exports_and_comparison(
         ),
         TEST_USER,
     )
-    assert response.filename == "data.csv"
+    assert response.headers["content-disposition"] == 'attachment; filename="data.csv"'
+    assert response.body == content
 
     comparison = await compare_build_resources(
         left.id,

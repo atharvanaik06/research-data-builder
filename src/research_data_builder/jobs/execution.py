@@ -3,7 +3,12 @@
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
-from research_data_builder.artifacts import export_research_bundle
+from research_data_builder.artifacts import (
+    ArtifactStorage,
+    ArtifactStorageError,
+    create_artifact_storage,
+    export_research_bundle,
+)
 from research_data_builder.core.config import Settings
 from research_data_builder.db.build_repositories import BuildRepository
 from research_data_builder.db.models import BuildRun, BuildStatus
@@ -47,10 +52,12 @@ class BuildJobExecutor:
         database: Database,
         registry: ProviderRegistry,
         settings: Settings,
+        artifact_storage: ArtifactStorage | None = None,
     ) -> None:
         self.database = database
         self.registry = registry
         self.settings = settings
+        self.artifact_storage = artifact_storage or create_artifact_storage(settings)
 
     async def execute(
         self,
@@ -147,7 +154,8 @@ class BuildJobExecutor:
                 entity_mapping_version=result.entity_mapping_version,
                 application_version=self.settings.app_version,
             )
-        except (OSError, ValueError) as error:
+            await self.artifact_storage.publish(bundle)
+        except (ArtifactStorageError, OSError, ValueError) as error:
             await self._fail_build(build_id, owner_id, "export_failed", str(error))
             raise BuildJobExecutionError("export_failed", str(error)) from error
 

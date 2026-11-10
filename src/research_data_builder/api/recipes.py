@@ -1,14 +1,20 @@
 """Versioned recipe and deterministic build-plan HTTP API."""
 
-import hashlib
+import mimetypes
 from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from research_data_builder.artifacts import (
+    ArtifactIntegrityError,
+    ArtifactLimitError,
+    ArtifactNotFoundError,
+    ArtifactStorage,
+    ArtifactStorageError,
+)
 from research_data_builder.audit import AuditRepository
 from research_data_builder.auth.dependencies import require_user
 from research_data_builder.core.config import Settings
@@ -582,24 +588,34 @@ async def get_build_exports(
         return [ExportResource.model_validate(export, from_attributes=True) for export in exports]
 
 
-@router.get("/exports/{export_id}/download", response_class=FileResponse)
-async def download_export(
-    export_id: UUID, request: Request, user: AuthenticatedUser
-) -> FileResponse:
+@router.get("/exports/{export_id}/download", response_class=Response)
+async def download_export(export_id: UUID, request: Request, user: AuthenticatedUser) -> Response:
     database: Database = request.app.state.database
-    settings: Settings = request.app.state.settings
+    artifact_storage: ArtifactStorage = request.app.state.artifact_storage
     async with database.session() as session:
         export = await BuildOutputRepository(session).get_export(export_id, user.id)
         if export is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="export not found")
-    root = settings.artifact_root.expanduser().resolve()
-    path = (root / export.relative_path).resolve()
-    if not path.is_relative_to(root) or not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact file not found")
-    if hashlib.sha256(path.read_bytes()).hexdigest() != export.sha256:
+    try:
+        content = await artifact_storage.load(export.relative_path, export.sha256)
+    except ArtifactNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="artifact file not found"
+        ) from None
+    except ArtifactIntegrityError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="artifact checksum mismatch"
-        )
+        ) from None
+    except ArtifactLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="artifact exceeds the download limit",
+        ) from None
+    except ArtifactStorageError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="artifact storage is unavailable",
+        ) from error
     async with database.session() as session, session.begin():
         await AuditRepository(session).record(
             user.id,
@@ -608,7 +624,12 @@ async def download_export(
             export.id,
             details={"name": export.name},
         )
-    return FileResponse(path, filename=export.name)
+    media_type = mimetypes.guess_type(export.name)[0] or "application/octet-stream"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{export.name}"'},
+    )
 
 
 @router.get("/builds/{build_id}/comparison/{other_build_id}")
