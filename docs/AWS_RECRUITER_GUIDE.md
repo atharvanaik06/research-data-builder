@@ -10,15 +10,15 @@ Do not say that you deployed the AWS resources. Say that you designed, coded, an
 
 ## 30-second explanation
 
-I designed the production AWS architecture with Terraform. It uses ECS Fargate for the API and worker, RDS PostgreSQL for durable state, SQS for jobs, and S3 for exports. I placed compute and the database in private subnets. I added encryption, managed secrets, backups, and a dead-letter queue. CI validates the Terraform files on every change. I did not apply the infrastructure because NAT Gateway, RDS, and Fargate can create recurring costs. I deployed a zero-cost demo topology instead.
+I designed the AWS production target. I implemented its Terraform foundation for networking, ECR, RDS PostgreSQL, SQS, S3, KMS, and Secrets Manager. I added private subnets, encryption, backups, and a dead-letter queue. CI validates the Terraform files on every change. ECS Fargate, the load balancer, IAM roles, and CloudWatch remain in the next unit. I did not apply the foundation because it can create recurring costs. I prepared a zero-cost demo topology instead.
 
 ## Two-minute explanation
 
 The application has two work types. The API handles short browser requests. The worker handles long dataset builds.
 
-In the AWS design, an Application Load Balancer sends traffic to API tasks on ECS Fargate. SQS separates API requests from worker execution. Worker tasks read jobs and write build state to RDS PostgreSQL. They store export files in a private S3 bucket.
+In the target AWS design, an Application Load Balancer sends traffic to API tasks on ECS Fargate. SQS separates API requests from worker execution. Worker tasks read jobs and write build state to RDS PostgreSQL. They store export files in a private S3 bucket.
 
-The VPC uses two availability zones. Public subnets hold the load balancer. Private subnets hold ECS tasks. Isolated database subnets hold RDS.
+The current Terraform implements the data and network foundation. Its VPC uses two availability zones. Public subnets reserve space for the load balancer. Private subnets reserve space for ECS tasks. Isolated database subnets hold RDS.
 
 Security groups allow only required network paths. The database accepts traffic only from the application tasks. S3 blocks public access.
 
@@ -30,19 +30,19 @@ I used Terraform so reviewers can inspect and repeat the design. GitHub Actions 
 
 ## What each AWS service does
 
-| AWS service | Purpose in this system | Design reason |
+| AWS service | Status | Purpose in this system |
 |---|---|---|
-| VPC | Controls network boundaries | Keeps compute and data services private |
-| Application Load Balancer | Receives HTTPS requests | Gives the API one public entry point |
-| ECS Fargate | Runs API and worker containers | Removes server maintenance |
-| ECR | Stores container images | Gives ECS a private image source |
-| RDS PostgreSQL | Stores users, recipes, jobs, and lineage | Provides transactions and managed backups |
-| SQS | Holds build jobs | Separates fast API work from long builds |
-| SQS dead-letter queue | Holds repeated failures | Supports inspection and safe replay |
-| S3 | Stores export bundles | Fits durable file storage better than PostgreSQL |
-| KMS | Encrypts stored data | Centralizes key control |
-| Secrets Manager | Stores credentials | Keeps secrets out of code and Terraform inputs |
-| CloudWatch | Stores logs and metrics | Supports alarms and incident review |
+| VPC | Implemented in Terraform | Controls private network boundaries |
+| Application Load Balancer | Planned | Gives the API one public HTTPS entry point |
+| ECS Fargate | Planned | Runs API and worker containers |
+| ECR | Implemented in Terraform | Stores private container images |
+| RDS PostgreSQL | Implemented in Terraform | Stores users, recipes, jobs, and lineage |
+| SQS | Implemented in Terraform | Separates fast API work from long builds |
+| SQS dead-letter queue | Implemented in Terraform | Holds repeated failures for review |
+| S3 | Implemented in Terraform | Stores export bundles |
+| KMS | Implemented in Terraform | Encrypts stored data |
+| Secrets Manager | Implemented in Terraform | Holds managed database credentials |
+| CloudWatch | Planned | Stores logs and metrics |
 
 ## Key trade-offs
 
@@ -92,7 +92,7 @@ The database uses deterministic build identities and atomic job claims. Worker l
 
 ### Why did you not use AWS for the public demo?
 
-The project has a zero-cost rule. NAT Gateway, RDS, and Fargate can create recurring charges. I kept the AWS design as validated infrastructure code.
+The project has a zero-cost rule. NAT Gateway and RDS can create recurring charges. I kept the completed AWS foundation as validated infrastructure code.
 
 ### What would you do before a production launch?
 
@@ -102,6 +102,6 @@ I would finish ECS services, IAM roles, alarms, deployment automation, and recov
 
 Use this statement:
 
-> Designed and validated a Terraform AWS architecture for a multi-user research-data platform. The design uses ECS Fargate, RDS PostgreSQL, SQS, S3, KMS, Secrets Manager, and private VPC networking. Added environment-specific reliability and cost controls. Deployed a separate zero-cost demo topology to avoid recurring cloud charges.
+> Designed and validated a Terraform AWS foundation for a multi-user research-data platform. Implemented RDS PostgreSQL, SQS, S3, KMS, Secrets Manager, ECR, and private VPC networking. Added environment-specific reliability and cost controls. Prepared a separate zero-cost demo topology to avoid recurring cloud charges.
 
 Do not use the word “deployed” for the AWS architecture until you apply it and test the live resources.
