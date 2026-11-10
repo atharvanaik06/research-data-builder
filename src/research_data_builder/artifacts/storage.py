@@ -65,9 +65,7 @@ class LocalArtifactStorage:
     def _check_bundle_size(self, bundle: BundleResult) -> None:
         size = sum(item.size_bytes for item in bundle.artifacts)
         if size > self.max_bundle_bytes:
-            raise ArtifactLimitError(
-                f"bundle uses {size} bytes; limit is {self.max_bundle_bytes}"
-            )
+            raise ArtifactLimitError(f"bundle uses {size} bytes; limit is {self.max_bundle_bytes}")
 
 
 class S3Client(Protocol):
@@ -100,9 +98,7 @@ class S3ArtifactStorage:
     def _publish(self, bundle: BundleResult) -> None:
         size = sum(item.size_bytes for item in bundle.artifacts)
         if size > self.max_bundle_bytes:
-            raise ArtifactLimitError(
-                f"bundle uses {size} bytes; limit is {self.max_bundle_bytes}"
-            )
+            raise ArtifactLimitError(f"bundle uses {size} bytes; limit is {self.max_bundle_bytes}")
         root = self.root.expanduser().resolve()
         for artifact in bundle.artifacts:
             path = (root / artifact.relative_path).resolve()

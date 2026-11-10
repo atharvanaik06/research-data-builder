@@ -72,6 +72,4 @@ def test_standard_postgresql_url_uses_async_psycopg_driver() -> None:
         _env_file=None,  # type: ignore[call-arg]
     )
 
-    assert settings.database_url == (
-        "postgresql+psycopg://user:secret@database.example/research"
-    )
+    assert settings.database_url == ("postgresql+psycopg://user:secret@database.example/research")

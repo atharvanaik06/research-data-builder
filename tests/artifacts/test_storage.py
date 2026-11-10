@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 
-from research_data_builder.core.config import Settings
 from research_data_builder.artifacts.models import BundleResult, ExportedArtifact
 from research_data_builder.artifacts.storage import (
     ArtifactIntegrityError,
@@ -18,6 +17,7 @@ from research_data_builder.artifacts.storage import (
     S3ArtifactStorage,
     create_artifact_storage,
 )
+from research_data_builder.core.config import Settings
 
 
 class FakeS3Client:
@@ -129,15 +129,11 @@ async def test_s3_storage_rejects_invalid_uploads_and_responses(tmp_path: Path) 
     artifact = result.artifacts[0]
 
     with pytest.raises(ArtifactLimitError, match="bundle uses"):
-        await S3ArtifactStorage(tmp_path, "artifacts", FakeS3Client(), 1, 100).publish(
-            result
-        )
+        await S3ArtifactStorage(tmp_path, "artifacts", FakeS3Client(), 1, 100).publish(result)
 
     (tmp_path / artifact.relative_path).unlink()
     with pytest.raises(ArtifactNotFoundError, match="generated artifact is missing"):
-        await S3ArtifactStorage(tmp_path, "artifacts", FakeS3Client(), 100, 100).publish(
-            result
-        )
+        await S3ArtifactStorage(tmp_path, "artifacts", FakeS3Client(), 100, 100).publish(result)
 
     missing = S3ArtifactStorage(tmp_path, "artifacts", MissingS3Client(), 100, 100)
     with pytest.raises(ArtifactNotFoundError, match="object does not exist"):
@@ -164,9 +160,7 @@ async def test_s3_storage_rejects_invalid_uploads_and_responses(tmp_path: Path) 
         )
 
 
-def test_storage_factory_creates_s3_client(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_storage_factory_creates_s3_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import boto3  # type: ignore[import-untyped]
 
     fake_client = FakeS3Client()
