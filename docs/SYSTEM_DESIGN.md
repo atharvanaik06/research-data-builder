@@ -1,5 +1,9 @@
 # Research Data Builder System Design
 
+![Phase 7 hand-drawn system design](research-data-builder-system-design.png)
+
+The diagram shows the complete Phase 7 request and data flow. The sections below explain each component and design decision.
+
 ## 1: Requirements
 
 ### 1.1 Functional requirements
