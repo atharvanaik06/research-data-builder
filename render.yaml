@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: research-data-builder
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 120
+    dockerCommand: >-
+      sh -c 'alembic upgrade head && uvicorn research_data_builder.main:app
+      --host 0.0.0.0 --port ${PORT:-10000}'
+    envVars:
+      - key: RESEARCH_DATA_ENVIRONMENT
+        value: production
+      - key: RESEARCH_DATA_LOG_LEVEL
+        value: INFO
+      - key: RESEARCH_DATA_DATABASE_URL
+        sync: false
+      - key: RESEARCH_DATA_FRED_API_KEY
+        sync: false
+      - key: RESEARCH_DATA_EMBEDDED_WORKER_ENABLED
+        value: "true"
+      - key: RESEARCH_DATA_WORKER_POLL_SECONDS
+        value: "2"
+      - key: RESEARCH_DATA_WORKER_LEASE_SECONDS
+        value: "60"
+      - key: RESEARCH_DATA_MAX_OUTSTANDING_BUILDS_PER_USER
+        value: "2"
+      - key: RESEARCH_DATA_MAX_RECIPE_BYTES
+        value: "32768"
+      - key: RESEARCH_DATA_ARTIFACT_STORAGE_BACKEND
+        value: s3
+      - key: RESEARCH_DATA_ARTIFACT_S3_BUCKET
+        sync: false
+      - key: RESEARCH_DATA_ARTIFACT_S3_ENDPOINT_URL
+        sync: false
+      - key: RESEARCH_DATA_ARTIFACT_S3_REGION
+        value: auto
+      - key: RESEARCH_DATA_ARTIFACT_S3_ACCESS_KEY_ID
+        sync: false
+      - key: RESEARCH_DATA_ARTIFACT_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: RESEARCH_DATA_ARTIFACT_MAX_BUNDLE_BYTES
+        value: "26214400"
+      - key: RESEARCH_DATA_ARTIFACT_MAX_DOWNLOAD_BYTES
+        value: "26214400"

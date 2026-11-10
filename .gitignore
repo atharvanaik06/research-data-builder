@@ -11,7 +11,7 @@ __pycache__/
 *.py[cod]
 .coverage*
 build/
-artifacts/
+/artifacts/
 coverage.xml
 dist/
 htmlcov/

@@ -312,6 +312,13 @@ Delivered so far:
 - Encrypted SQS build queue and dead-letter queue.
 - KMS and Secrets Manager foundations.
 - GitHub Actions formatting and validation for Terraform.
+- S3-compatible artifact storage with checksum and size checks.
+- One-process API and worker mode for free hosting.
+- A free Render deployment description.
+- A zero-cost design with external PostgreSQL and object storage.
+- AWS interview notes that explain production decisions and trade-offs.
+
+The repository does not apply the AWS design. This choice prevents recurring cloud charges during the portfolio stage.
 
 Deliverables:
 
@@ -335,7 +342,9 @@ Likely commits:
 5. `ci: automate production deployment`
 6. `docs: publish production architecture and live demo`
 
-Demo: submit a real build, watch asynchronous progress, and download a verified export bundle from the deployed service.
+Next unit: connect the free service accounts, deploy the demo, and run one real end-to-end build.
+
+Demo target: submit a real build, watch asynchronous progress, and download a verified export bundle.
 
 **Production milestone:** tag `v1.0.0`.
 

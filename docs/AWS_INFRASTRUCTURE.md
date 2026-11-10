@@ -4,6 +4,8 @@
 
 Terraform defines the AWS foundation. No command in the repository creates live resources without an explicit `terraform apply`.
 
+The project uses this foundation as its production reference design. The zero-cost public demo does not apply these resources.
+
 The foundation contains:
 
 - a VPC in two availability zones.
@@ -52,6 +54,10 @@ The SQS queue uses long polling and KMS encryption. SQS moves a message to the d
 The development defaults use one NAT gateway, one small RDS instance, and no Multi-AZ standby. NAT gateways and RDS create continuous charges.
 
 Always review the Terraform plan and AWS cost estimate before an apply. Do not create production resources during development tests.
+
+See [AWS Recruiter and Interview Guide](AWS_RECRUITER_GUIDE.md) for an honest explanation of the design and its trade-offs.
+
+See [Zero-Cost Demo Deployment](ZERO_COST_DEPLOYMENT.md) for the public demo design.
 
 ## Next infrastructure unit
 

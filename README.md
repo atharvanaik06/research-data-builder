@@ -47,7 +47,7 @@ The local MVP will support:
 - exact input and transformation lineage;
 - fixture-driven tests that do not depend on live provider availability.
 
-Cloud storage, additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
+Additional providers, vintage-aware backtesting, and AI-assisted recipe creation are later phases.
 
 Phase 7 is complete. The product includes secure accounts, private research ownership, immutable builds, a PostgreSQL background queue, cached provider inputs, activity history, user limits, and a browser interface.
 
@@ -91,6 +91,10 @@ Phases 1 through 7 are complete. A researcher can now use the full local workflo
 - a private activity history for recipe, build, worker, and download events;
 - a guided browser workflow for recipes, builds, previews, validation, and downloads;
 - PostgreSQL integration tests for decimal precision, constraints, ordering, and rollback.
+- local and S3-compatible artifact storage with checksum and size checks;
+- an embedded worker mode for hosts without a separate free worker service;
+- a zero-cost Render deployment description;
+- a validated AWS Terraform production reference design.
 
 See the checked-in [sample research bundle](examples/sample_bundle/README.md) without running the application.
 
@@ -152,9 +156,13 @@ docker compose up --build
 - [Browser workflow](docs/WEB_APP.md)
 - [Audit history and user limits](docs/AUDIT_AND_LIMITS.md)
 - [AWS infrastructure](docs/AWS_INFRASTRUCTURE.md)
+- [Zero-cost demo deployment](docs/ZERO_COST_DEPLOYMENT.md)
+- [AWS recruiter and interview guide](docs/AWS_RECRUITER_GUIDE.md)
 - [Adversarial review findings and engineering backlog](docs/REVIEW_FINDINGS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 
 ## Current status
 
-The complete hosted-workflow foundation is implemented through Phase 7. Phase 8 will deploy the API, worker, PostgreSQL database, queue, and artifact storage on AWS.
+Phases 1 through 7 are complete. Phase 8 now includes an AWS production reference design and a zero-cost demo deployment design.
+
+The next step is to connect the free service accounts and deploy the public demo. The project does not create paid AWS resources.

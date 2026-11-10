@@ -97,14 +97,25 @@ Settings use the `RESEARCH_DATA_` environment prefix.
 | `RESEARCH_DATA_PROVIDER_HTTP_MAX_ATTEMPTS` | `3` | Maximum attempts for transient provider failures |
 | `RESEARCH_DATA_PROVIDER_CACHE_TTL_HOURS` | `24` | Valid lifetime for a cached provider response |
 | `RESEARCH_DATA_ARTIFACT_ROOT` | `artifacts` | Controlled root for generated build bundles |
+| `RESEARCH_DATA_ARTIFACT_STORAGE_BACKEND` | `local` | `local` or `s3` artifact storage |
+| `RESEARCH_DATA_ARTIFACT_S3_BUCKET` | unset | Private S3-compatible bucket name |
+| `RESEARCH_DATA_ARTIFACT_S3_ENDPOINT_URL` | unset | S3-compatible service endpoint |
+| `RESEARCH_DATA_ARTIFACT_S3_REGION` | `auto` | S3-compatible service region |
+| `RESEARCH_DATA_ARTIFACT_S3_ACCESS_KEY_ID` | unset | S3-compatible access key |
+| `RESEARCH_DATA_ARTIFACT_S3_SECRET_ACCESS_KEY` | unset | S3-compatible secret key |
+| `RESEARCH_DATA_ARTIFACT_MAX_BUNDLE_BYTES` | `26214400` | Maximum total export size |
+| `RESEARCH_DATA_ARTIFACT_MAX_DOWNLOAD_BYTES` | `26214400` | Maximum single download size |
 | `RESEARCH_DATA_SESSION_COOKIE_NAME` | `research_data_session` | Opaque browser-session cookie name |
 | `RESEARCH_DATA_SESSION_TTL_HOURS` | `168` | Session lifetime in hours |
 | `RESEARCH_DATA_WORKER_POLL_SECONDS` | `1` | Delay between empty queue checks |
 | `RESEARCH_DATA_WORKER_LEASE_SECONDS` | `60` | Worker lease duration in seconds |
+| `RESEARCH_DATA_EMBEDDED_WORKER_ENABLED` | `false` | Runs one worker in the API process |
 | `RESEARCH_DATA_MAX_OUTSTANDING_BUILDS_PER_USER` | `5` | Maximum queued and running builds for one user |
 | `RESEARCH_DATA_MAX_RECIPE_BYTES` | `65536` | Maximum stored recipe size in bytes |
 
 Copy `.env.example` to `.env` for local overrides. `.env` is ignored by Git. Never commit provider keys, passwords, or private research credentials.
+
+Use the embedded worker only when the host cannot run a separate worker service. Local Docker and production AWS use separate worker processes.
 
 ## Quality checks
 
