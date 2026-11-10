@@ -85,3 +85,33 @@ jobs:
 
       - name: Build production image
         run: docker build --tag research-data-builder:ci .
+
+  infrastructure:
+    name: Validate Terraform infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.17.1"
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: Validate state bootstrap
+        working-directory: infra/terraform/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Validate platform foundation
+        working-directory: infra/terraform/platform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate

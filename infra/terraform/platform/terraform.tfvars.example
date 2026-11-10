@@ -1,0 +1,12 @@
+environment = "dev"
+aws_region  = "eu-central-1"
+
+single_nat_gateway = true
+
+database_instance_class      = "db.t4g.micro"
+database_multi_az            = false
+database_deletion_protection = false
+
+tags = {
+  Owner = "atharvanaik06"
+}

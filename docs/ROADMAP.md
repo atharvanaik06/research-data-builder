@@ -297,7 +297,21 @@ Demo: two users create builds concurrently without viewing each other's private 
 
 ## Phase 8: Deploy and operate on AWS
 
+**Status:** in progress.
+
 **Goal:** run the product reliably in the cloud.
+
+Delivered so far:
+
+- Terraform state bootstrap with private S3 versioning and state locking.
+- A two-availability-zone VPC with public, private, and database subnets.
+- Development and production NAT gateway policies.
+- Encrypted ECR repositories for API and worker images.
+- Private and encrypted RDS PostgreSQL with managed credentials and backups.
+- Encrypted S3 artifact storage with public access blocked.
+- Encrypted SQS build queue and dead-letter queue.
+- KMS and Secrets Manager foundations.
+- GitHub Actions formatting and validation for Terraform.
 
 Deliverables:
 

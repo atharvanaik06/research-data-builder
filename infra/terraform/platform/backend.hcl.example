@@ -1,0 +1,5 @@
+bucket       = "replace-with-the-bootstrap-state-bucket"
+key          = "research-data-builder/dev/platform.tfstate"
+region       = "eu-central-1"
+encrypt      = true
+use_lockfile = true

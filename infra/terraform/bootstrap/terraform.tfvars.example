@@ -1,0 +1,2 @@
+state_bucket_name = "replace-with-a-globally-unique-state-bucket"
+aws_region        = "eu-central-1"

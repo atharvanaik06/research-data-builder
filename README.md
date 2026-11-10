@@ -151,6 +151,7 @@ docker compose up --build
 - [Provider-input cache](docs/PROVIDER_CACHE.md)
 - [Browser workflow](docs/WEB_APP.md)
 - [Audit history and user limits](docs/AUDIT_AND_LIMITS.md)
+- [AWS infrastructure](docs/AWS_INFRASTRUCTURE.md)
 - [Adversarial review findings and engineering backlog](docs/REVIEW_FINDINGS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 

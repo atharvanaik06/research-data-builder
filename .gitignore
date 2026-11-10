@@ -15,4 +15,15 @@ artifacts/
 coverage.xml
 dist/
 htmlcov/
+.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+backend.hcl
 
