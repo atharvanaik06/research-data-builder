@@ -12,9 +12,11 @@ RUN python -m pip install --no-cache-dir -r requirements.runtime.lock
 COPY pyproject.toml README.md ./
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY scripts/start_render.sh /app/start-render.sh
 COPY src ./src
 RUN python -m pip install --no-cache-dir --no-deps . \
     && useradd --create-home --uid 10001 appuser \
+    && chmod 755 /app/start-render.sh \
     && chown -R appuser:appuser /app
 
 USER appuser

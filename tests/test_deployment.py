@@ -17,8 +17,11 @@ def test_render_blueprint_uses_one_free_service_and_external_secrets() -> None:
     assert service["region"] == "ohio"
     assert service["healthCheckPath"] == "/health"
     assert "maxShutdownDelaySeconds" not in service
-    assert service["dockerCommand"].startswith("alembic upgrade head && uvicorn")
-    assert "sh -c" not in service["dockerCommand"]
+    assert service["dockerCommand"] == "/app/start-render.sh"
+
+    start_script = Path("scripts/start_render.sh").read_text()
+    assert "alembic upgrade head" in start_script
+    assert "exec uvicorn research_data_builder.main:app" in start_script
 
     environment = {item["key"]: item for item in service["envVars"]}
     assert environment["RESEARCH_DATA_EMBEDDED_WORKER_ENABLED"]["value"] == "true"
