@@ -22,6 +22,8 @@ flowchart LR
 
 Render runs the API and worker in one free web service. Neon stores accounts, recipes, jobs, and lineage. Object storage holds export bundles.
 
+The demo runs Render and Neon in Ohio. This choice reduces network delay between the application and its data services.
+
 This design removes the need for a paid worker service. The application uses the PostgreSQL queue from Phase 7.
 
 ## Limits

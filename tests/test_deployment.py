@@ -14,7 +14,9 @@ def test_render_blueprint_uses_one_free_service_and_external_secrets() -> None:
     assert service["type"] == "web"
     assert service["runtime"] == "docker"
     assert service["plan"] == "free"
+    assert service["region"] == "ohio"
     assert service["healthCheckPath"] == "/health"
+    assert "maxShutdownDelaySeconds" not in service
 
     environment = {item["key"]: item for item in service["envVars"]}
     assert environment["RESEARCH_DATA_EMBEDDED_WORKER_ENABLED"]["value"] == "true"
