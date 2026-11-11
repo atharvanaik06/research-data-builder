@@ -164,7 +164,13 @@ def test_storage_factory_creates_s3_client(tmp_path: Path, monkeypatch: pytest.M
     import boto3  # type: ignore[import-untyped]
 
     fake_client = FakeS3Client()
-    monkeypatch.setattr(boto3, "client", lambda *args, **kwargs: fake_client)
+    client_options: dict[str, Any] = {}
+
+    def create_fake_client(*args: Any, **kwargs: Any) -> FakeS3Client:
+        client_options.update(kwargs)
+        return fake_client
+
+    monkeypatch.setattr(boto3, "client", create_fake_client)
     settings = Settings(
         artifact_root=tmp_path,
         artifact_storage_backend="s3",
@@ -179,3 +185,5 @@ def test_storage_factory_creates_s3_client(tmp_path: Path, monkeypatch: pytest.M
 
     assert isinstance(storage, S3ArtifactStorage)
     assert storage.client is fake_client
+    assert client_options["config"].signature_version == "s3v4"
+    assert client_options["config"].s3 == {"addressing_style": "path"}

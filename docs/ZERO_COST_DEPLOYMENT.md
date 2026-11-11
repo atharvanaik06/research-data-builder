@@ -66,7 +66,7 @@ Do not commit these values. Render stores them as private environment variables.
 
 ## Object storage choices
 
-The code uses the S3 API. It does not require AWS S3.
+The code uses the S3 API. It does not require AWS S3. Neon uses S3 version 4 signatures and path-style object addresses.
 
 You can use a free S3-compatible service. Cloudflare R2 is one option. Neon object storage can also fit this design when available.
 

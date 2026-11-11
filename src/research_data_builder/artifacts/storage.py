@@ -165,7 +165,10 @@ def create_artifact_storage(settings: Settings) -> ArtifactStorage:
         region_name=settings.artifact_s3_region,
         aws_access_key_id=settings.artifact_s3_access_key_id.get_secret_value(),
         aws_secret_access_key=settings.artifact_s3_secret_access_key.get_secret_value(),
-        config=Config(signature_version="s3v4"),
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+        ),
     )
     return S3ArtifactStorage(
         settings.artifact_root,

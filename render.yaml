@@ -34,7 +34,7 @@ services:
       - key: RESEARCH_DATA_ARTIFACT_S3_ENDPOINT_URL
         sync: false
       - key: RESEARCH_DATA_ARTIFACT_S3_REGION
-        value: auto
+        value: us-east-2
       - key: RESEARCH_DATA_ARTIFACT_S3_ACCESS_KEY_ID
         sync: false
       - key: RESEARCH_DATA_ARTIFACT_S3_SECRET_ACCESS_KEY
