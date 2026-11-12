@@ -1,5 +1,6 @@
 """End-to-end fixture execution across retrieval, harmonization, and joins."""
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from typing import cast
@@ -9,6 +10,7 @@ import pytest
 
 from research_data_builder.db.models import RecipeVersion
 from research_data_builder.engine.executor import BuildExecutor
+from research_data_builder.provenance import dataset_checksum
 from research_data_builder.providers import (
     DataProvider,
     Frequency,
@@ -96,3 +98,24 @@ async def test_executor_builds_stable_wide_table_and_explains_unmatched_rows() -
     assert result.frame["inflation"].to_list() == [None, Decimal("3.0000000000")]
     assert result.join_reports[0].left_only_keys == 1
     assert result.join_reports[0].right_only_keys == 0
+
+
+@pytest.mark.anyio
+async def test_outer_join_hash_matches_for_omitted_and_explicit_null_cells() -> None:
+    version, plan = version_and_plan()
+    connector = ObservationConnector()
+    snapshots = {
+        item.output_name: await connector.get_observations(
+            ObservationQuery(indicator_id=item.indicator_id)
+        )
+        for item in plan.inputs
+    }
+    executor = BuildExecutor(ProviderRegistry([]))
+    omitted = await executor.execute(version, plan, saved_inputs=snapshots)
+    snapshots["inflation"].append(
+        replace(snapshots["inflation"][0], entity_id="CZE", value=None, is_missing=True)
+    )
+    explicit_null = await executor.execute(version, plan, saved_inputs=snapshots)
+
+    assert omitted.join_reports != explicit_null.join_reports
+    assert dataset_checksum(omitted.frame) == dataset_checksum(explicit_null.frame)

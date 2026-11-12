@@ -67,7 +67,7 @@ class BuildJobExecutor:
         progress: ProgressCallback,
         preview_limit: int = 100,
     ) -> BuildRun:
-        async with self.database.session() as session:
+        async with self.database.session() as session, session.begin():
             build = await BuildRepository(session).get(build_id, owner_id)
             if build is None:
                 raise BuildJobExecutionError("build_not_found", "build does not exist")
@@ -81,11 +81,20 @@ class BuildJobExecutor:
                 raise BuildJobExecutionError("version_unavailable", "recipe version does not exist")
             job = await BuildJobRepository(session).get_for_build(build_id, owner_id)
             force_refresh = job.force_refresh if job is not None else False
+            build.transformer_version = self.settings.transformer_version
 
         await progress("retrieving")
         try:
             plan = BuildPlan.from_dict(build.plan)
-            if job is None:
+            if build.replay_of_id is not None:
+                cache = ProviderObservationCache(
+                    self.database, ttl_hours=self.settings.provider_cache_ttl_hours
+                )
+                saved_inputs = await cache.load_saved(build_id)
+                result = await BuildExecutor(self.registry).execute(
+                    version, plan, saved_inputs=saved_inputs
+                )
+            elif job is None:
                 result = await BuildExecutor(self.registry).execute(version, plan)
             else:
                 cache = ProviderObservationCache(
@@ -153,6 +162,8 @@ class BuildJobExecutor:
                 validation=validation,
                 entity_mapping_version=result.entity_mapping_version,
                 application_version=self.settings.app_version,
+                transformer_version=build.transformer_version,
+                deployment_commit=self.settings.deployment_commit,
             )
             await self.artifact_storage.publish(bundle)
         except (ArtifactStorageError, OSError, ValueError) as error:

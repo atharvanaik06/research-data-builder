@@ -104,6 +104,15 @@
           </section>
 
           <section id="results-panel" class="results" hidden>
+            <section class="panel">
+              <h2>Reproducibility</h2>
+              <p id="replay-result" role="status"></p>
+              <div class="action-row">
+                <button id="replay-build" class="secondary-button" type="button">Replay saved inputs</button>
+                <button id="refresh-build" class="secondary-button" type="button">Build with fresh data</button>
+                <button id="return-build" class="secondary-button" type="button" hidden>View previous build</button>
+              </div>
+            </section>
             <div class="result-tabs" role="tablist" aria-label="Build results">
               <button class="tab active" type="button" data-panel="preview-result">Preview</button>
               <button class="tab" type="button" data-panel="validation-result">Validation</button>

@@ -2,7 +2,46 @@
 
 ![Phase 7 hand-drawn system design](research-data-builder-system-design.png)
 
-The diagram shows the complete Phase 7 request and data flow. The sections below explain each component and design decision.
+The diagram shows the Phase 7 request and data flow. The replay workflow below extends
+the build path with pinned input snapshots and checksum verification.
+
+## Replay and refresh
+
+```mermaid
+flowchart LR
+    U[Browser] --> A[FastAPI]
+    A --> Q[(Neon PostgreSQL)]
+    Q --> W[Build worker on Render]
+    F[FRED and World Bank] -->|Fresh build| W
+    Q -->|Pinned normalized snapshots| W
+    W --> P[Polars transforms and validation]
+    P -->|Logical checksum and build result| Q
+    P -->|Research bundle| O[(S3-compatible object storage)]
+```
+
+- **Original build.** The worker links each input to a PostgreSQL snapshot of
+  normalized observations. The cache expiry controls reuse for fresh retrievals.
+- **Refresh.** The API queues a new attempt using the same frozen plan and bypasses
+  the provider cache. The original build and snapshots remain available.
+- **Replay.** The API queues a new attempt and copies the original snapshot IDs.
+  The worker verifies the stored input fingerprints and loads those snapshots
+  directly. Missing or invalid snapshots fail the build. Replay requires no
+  configured providers and does not depend on a previous worker's local files.
+- **Verification.** The logical SHA-256 includes schema and rows in join-key
+  order, with recipe-ordered columns, fixed-scale decimals, and JSON nulls.
+  Each exported file has its own checksum. The build view compares logical
+  checksums, and the bundle manifest records the transformer compatibility version
+  and, on Render, the deployment commit.
+- **Compatibility.** Replay runs the installed transformer. A compatibility
+  version change produces a warning independent of the checksum comparison.
+  Normalized snapshots isolate replay from upstream formats. A parser fix needs
+  fresh retrieval. Cache hits and replay share snapshots, while a forced refresh
+  can store a duplicate payload.
+
+The Render service runs the API and worker in one container. PostgreSQL holds
+durable jobs and snapshots, and object storage holds exported bundles. The
+[deployment checklist](ZERO_COST_DEPLOYMENT.md#verify-hosted-replay-after-a-restart)
+covers persistence and reconnection after idle.
 
 ## 1: Requirements
 
@@ -35,7 +74,7 @@ The system must:
 | Reproducibility | Every export has a frozen recipe, input manifest, lineage, and checksum. |
 | Consistency | Build state cannot report success before validation and required artifacts complete. |
 | Reliability | Provider failures use bounded retries and do not destroy previously cached inputs. |
-| Performance | Transformations operate in bounded batches using Polars or DuckDB. |
+| Performance | The worker uses Polars for the supported recipe sizes. |
 | Scalability | API, provider retrieval, build workers, and artifact storage scale independently. |
 | Security | Credentials remain external and users cannot access another user's private research. |
 | Observability | A build is traceable from API request through retrieval, validation, and export. |
@@ -45,7 +84,7 @@ The system must:
 
 The local MVP supports FRED and World Bank structured data, saved recipes, deterministic harmonization, validation, and reproducible export bundles.
 
-Authentication, a full web interface, distributed queues, AWS, AI recipe assistance, arbitrary files, and point-in-time backtesting are later phases.
+The hosted demo includes private accounts, a browser workflow, and a PostgreSQL-backed queue. AWS is documented as a reference design. AI recipe assistance, arbitrary files, and point-in-time backtesting are outside the demo scope.
 
 ## 2: Core items
 
@@ -110,7 +149,7 @@ Metadata for a generated artifact: format, location, schema, row count, size, co
 5. **Recipe service** — validates drafts and freezes immutable versions.
 6. **Build planner** — resolves required provider requests and deterministic build identity.
 7. **Retrieval service** — fetches or reuses suitable provider inputs.
-8. **Transformation engine** — executes harmonization, transformations, and joins with Polars or DuckDB.
+8. **Transformation engine** — executes harmonization, transformations, and joins with Polars.
 9. **Validation engine** — produces machine-readable warnings and errors.
 10. **Provenance service** — records source-to-output lineage and canonical checksums.
 11. **Export service** — writes data and documentation artifacts.

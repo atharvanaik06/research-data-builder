@@ -1,6 +1,7 @@
 """Validated environment-based application settings."""
 
 from functools import lru_cache
+from os import getenv
 from pathlib import Path
 from typing import Literal
 
@@ -8,6 +9,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from research_data_builder import __version__
+from research_data_builder.engine import TRANSFORMER_VERSION
 
 Environment = Literal["development", "test", "production"]
 ArtifactStorageBackend = Literal["local", "s3"]
@@ -25,6 +27,12 @@ class Settings(BaseSettings):
 
     app_name: str = "research-data-builder"
     app_version: str = __version__
+    transformer_version: str = Field(
+        default=TRANSFORMER_VERSION,
+        min_length=1,
+        max_length=128,
+    )
+    deployment_commit: str | None = Field(default_factory=lambda: getenv("RENDER_GIT_COMMIT"))
     environment: Environment = "development"
     log_level: str = "INFO"
     database_url: str = Field(

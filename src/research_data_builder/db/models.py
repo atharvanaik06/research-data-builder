@@ -457,6 +457,10 @@ class BuildRun(Base):
     row_count: Mapped[int | None] = mapped_column(Integer)
     preview: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     execution_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    replay_of_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("build_runs.id", name="fk_build_runs_replay_source")
+    )
+    transformer_version: Mapped[str | None] = mapped_column(String(128))
     dataset_checksum: Mapped[str | None] = mapped_column(String(64))
     bundle_path: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

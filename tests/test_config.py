@@ -73,3 +73,16 @@ def test_standard_postgresql_url_uses_async_psycopg_driver() -> None:
     )
 
     assert settings.database_url == ("postgresql+psycopg://user:secret@database.example/research")
+
+
+def test_transformer_version_is_independent_of_render_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "first")
+    first = Settings(_env_file=None)  # type: ignore[call-arg]
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "second")
+    second = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert first.deployment_commit == "first"
+    assert second.deployment_commit == "second"
+    assert first.transformer_version == second.transformer_version

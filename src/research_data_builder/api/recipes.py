@@ -67,6 +67,13 @@ class BuildResource(BaseModel):
     execution_summary: dict[str, object] | None = None
     dataset_checksum: str | None = None
     bundle_path: str | None = None
+    can_replay: bool = False
+    replay_of_id: UUID | None = None
+    original_dataset_checksum: str | None = None
+    replay_matches: bool | None = None
+    transformer_version: str | None = None
+    original_transformer_version: str | None = None
+    replay_version_warning: str | None = None
 
 
 class BuildPreviewResource(BaseModel):
@@ -141,6 +148,8 @@ def build_resource(build: BuildRun) -> BuildResource:
         execution_summary=build.execution_summary,
         dataset_checksum=build.dataset_checksum,
         bundle_path=build.bundle_path,
+        replay_of_id=build.replay_of_id,
+        transformer_version=build.transformer_version,
     )
 
 
@@ -373,10 +382,72 @@ async def plan_build(
 async def get_build(build_id: UUID, request: Request, user: AuthenticatedUser) -> BuildResource:
     database: Database = request.app.state.database
     async with database.session() as session:
-        build = await BuildRepository(session).get(build_id, user.id)
+        builds = BuildRepository(session)
+        build = await builds.get(build_id, user.id)
         if build is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
-        return build_resource(build)
+        resource = build_resource(build)
+        resource.can_replay = await builds.can_replay(build)
+        if build.replay_of_id is not None:
+            source = await builds.get(build.replay_of_id, user.id)
+            if source is not None:
+                resource.original_dataset_checksum = source.dataset_checksum
+                resource.original_transformer_version = source.transformer_version
+                current_version = (
+                    build.transformer_version or request.app.state.settings.transformer_version
+                )
+                if source.transformer_version is None:
+                    resource.replay_version_warning = "Original transformer version is unknown."
+                elif source.transformer_version != current_version:
+                    resource.replay_version_warning = (
+                        f"Transformer version changed from {source.transformer_version} "
+                        f"to {current_version}. Replay may produce a different dataset."
+                    )
+                if source.dataset_checksum and build.dataset_checksum:
+                    resource.replay_matches = source.dataset_checksum == build.dataset_checksum
+        return resource
+
+
+@router.post(
+    "/builds/{build_id}/rerun",
+    response_model=BuildJobResource,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rerun_build(
+    build_id: UUID,
+    request: Request,
+    user: AuthenticatedUser,
+    mode: Literal["replay", "refresh"] = Query(),
+) -> BuildJobResource:
+    """Queue a replay or a fresh retrieval against a completed build's frozen plan."""
+    database: Database = request.app.state.database
+    async with database.session() as session, session.begin():
+        builds = BuildRepository(session)
+        source = await builds.get(build_id, user.id)
+        if source is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="build not found")
+        try:
+            build = await builds.create_rerun(source, replay=mode == "replay")
+            queued = await BuildJobRepository(session).enqueue(
+                build,
+                force_refresh=mode == "refresh",
+                max_outstanding=request.app.state.settings.max_outstanding_builds_per_user,
+            )
+        except UserBuildLimitError as error:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"code": "user_build_limit", "message": str(error)},
+            ) from error
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+        await AuditRepository(session).record(
+            user.id,
+            f"build.{mode}_queued",
+            "build",
+            build.id,
+            details={"source_build_id": str(source.id)},
+        )
+        return job_resource(queued.job)
 
 
 @router.post(

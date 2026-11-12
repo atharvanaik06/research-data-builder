@@ -1,4 +1,4 @@
-const state = { mode: "login", recipeId: null, versionId: null, buildId: null, poll: null };
+const state = { mode: "login", recipeId: null, versionId: null, buildId: null, previousBuildId: null, poll: null };
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;",
@@ -115,8 +115,15 @@ async function saveAndBuild(event) {
     state.versionId = version.id;
     const build = await api(`/api/v1/recipe-versions/${version.id}/builds`, { method: "POST" });
     state.buildId = build.id;
-    const refresh = $("force-refresh").checked ? "?refresh_provider_inputs=true" : "";
-    await api(`/api/v1/builds/${build.id}/execute${refresh}`, { method: "POST" });
+    state.previousBuildId = null;
+    if (build.status === "succeeded" && $("force-refresh").checked) {
+      await rerunBuild("refresh");
+      return;
+    }
+    if (build.status === "planned" || build.status === "queued") {
+      const refresh = $("force-refresh").checked ? "?refresh_provider_inputs=true" : "";
+      await api(`/api/v1/builds/${build.id}/execute${refresh}`, { method: "POST" });
+    }
     $("build-panel").hidden = false;
     $("results-panel").hidden = true;
     $("build-status").textContent = "queued";
@@ -148,17 +155,45 @@ async function pollBuild() {
 function startPolling() { clearInterval(state.poll); pollBuild(); state.poll = setInterval(pollBuild, 1500); }
 
 async function loadResults() {
-  const [preview, validation, exports] = await Promise.all([
+  const [build, preview, validation, exports] = await Promise.all([
+    api(`/api/v1/builds/${state.buildId}`),
     api(`/api/v1/builds/${state.buildId}/preview`),
     api(`/api/v1/builds/${state.buildId}/validation`),
     api(`/api/v1/builds/${state.buildId}/exports`),
   ]);
   $("results-panel").hidden = false;
+  $("replay-build").disabled = !build.can_replay;
+  $("return-build").hidden = !state.previousBuildId;
+  const checksum = `Dataset SHA-256: ${build.dataset_checksum || "unavailable"}`;
+  const replay = build.replay_matches === null ? "" : (
+    `${build.replay_matches ? "Replay matches" : "Replay differs from"} the original. ` +
+    `Original SHA-256: ${build.original_dataset_checksum}. `
+  );
+  const availability = build.can_replay ? "" : " Replay requires a complete set of saved inputs.";
+  const warning = build.replay_version_warning ? ` ${build.replay_version_warning}` : "";
+  $("replay-result").textContent = replay + checksum + availability + warning;
   const header = preview.columns.map((item) => `<th>${escapeHtml(item)}</th>`).join("");
   const rows = preview.rows.map((row) => `<tr>${preview.columns.map((key) => `<td>${escapeHtml(row[key])}</td>`).join("")}</tr>`).join("");
   $("preview-result").innerHTML = `<h2>Dataset preview</h2><p>${preview.preview_row_count} of ${preview.total_row_count} rows</p><table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
   $("validation-result").innerHTML = `<h2>Validation results</h2>${validation.length ? validation.map((item) => `<div class="finding"><strong>${escapeHtml(item.severity)}: ${escapeHtml(item.code)}</strong><p>${escapeHtml(item.message)}</p></div>`).join("") : "<p>No validation findings.</p>"}`;
   $("exports-result").innerHTML = `<h2>Research bundle</h2><div class="download-list">${exports.map((item) => `<a class="download-link" href="/api/v1/exports/${encodeURIComponent(item.id)}/download"><span>${escapeHtml(item.name)}</span><span>${Math.ceil(item.size_bytes / 1024)} KB ↓</span></a>`).join("")}</div>`;
+}
+
+async function rerunBuild(mode) {
+  const button = $(mode === "replay" ? "replay-build" : "refresh-build");
+  button.disabled = true;
+  try {
+    const job = await api(`/api/v1/builds/${state.buildId}/rerun?mode=${mode}`, { method: "POST" });
+    state.previousBuildId = state.buildId;
+    state.buildId = job.build_id;
+    $("build-panel").hidden = false;
+    $("results-panel").hidden = true;
+    $("build-title").textContent = mode === "replay" ? "Replaying saved inputs" : "Building with fresh data";
+    $("cancel-build").hidden = false;
+    $("retry-build").hidden = true;
+    startPolling();
+  } catch (error) { showError(error.message); }
+  finally { button.disabled = false; }
 }
 
 async function cancelBuild() { try { await api(`/api/v1/builds/${state.buildId}/cancel`, { method: "POST" }); await pollBuild(); } catch (error) { showError(error.message); } }
@@ -188,7 +223,7 @@ async function authenticate(event) {
   } catch (error) { showError(error.message, "auth-error"); }
 }
 function enterWorkspace(user) { setView(true); $("account-email").textContent = user.email; loadRecipes().catch((error) => showError(error.message)); }
-function resetDraft() { state.recipeId = null; state.versionId = null; state.buildId = null; $("recipe-form").reset(); $("variables").replaceChildren(); addVariable(); $("save-status").textContent = "New draft"; $("build-panel").hidden = true; $("results-panel").hidden = true; }
+function resetDraft() { state.recipeId = null; state.versionId = null; state.buildId = null; state.previousBuildId = null; $("recipe-form").reset(); $("variables").replaceChildren(); addVariable(); $("save-status").textContent = "New draft"; $("build-panel").hidden = true; $("results-panel").hidden = true; }
 
 document.addEventListener("DOMContentLoaded", async () => {
   addVariable();
@@ -200,6 +235,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("new-recipe").addEventListener("click", resetDraft);
   $("cancel-build").addEventListener("click", cancelBuild);
   $("retry-build").addEventListener("click", retryBuild);
+  $("replay-build").addEventListener("click", () => rerunBuild("replay"));
+  $("refresh-build").addEventListener("click", () => rerunBuild("refresh"));
+  $("return-build").addEventListener("click", async () => {
+    state.buildId = state.previousBuildId;
+    state.previousBuildId = null;
+    $("build-title").textContent = "Previous dataset build";
+    await pollBuild();
+  });
   $("show-audit").addEventListener("click", loadAudit);
   $("close-audit").addEventListener("click", () => { $("audit-panel").hidden = true; $("recipe-form").hidden = false; });
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => { document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab)); document.querySelectorAll(".result-panel").forEach((panel) => panel.hidden = panel.id !== tab.dataset.panel); }));

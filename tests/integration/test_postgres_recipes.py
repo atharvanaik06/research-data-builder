@@ -3,15 +3,18 @@
 import asyncio
 import os
 import tempfile
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
 import pytest
-from sqlalchemy import delete
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import delete, update
 
 from research_data_builder.artifacts import export_research_bundle
+from research_data_builder.auth.dependencies import require_user
+from research_data_builder.core.config import Settings
 from research_data_builder.db.build_repositories import BuildRepository, BuildTransitionError
 from research_data_builder.db.models import (
     AuditEvent,
@@ -35,7 +38,10 @@ from research_data_builder.db.output_repositories import BuildOutputRepository
 from research_data_builder.db.recipe_repositories import RecipeRepository, RecipeVersionRepository
 from research_data_builder.db.session import Database
 from research_data_builder.engine.executor import BuildExecutor
+from research_data_builder.jobs.execution import BuildJobExecutor
 from research_data_builder.jobs.repository import BuildJobRepository
+from research_data_builder.jobs.worker import BuildWorker
+from research_data_builder.main import create_app
 from research_data_builder.providers import (
     DataProvider,
     Frequency,
@@ -49,6 +55,7 @@ from research_data_builder.providers import (
 from research_data_builder.recipes.planner import BuildPlanner
 from research_data_builder.recipes.schemas import RecipeDefinition
 from research_data_builder.validation import validate_dataset
+from scripts.demo_replay import RevisionFixture, fixture_recipe
 from tests.recipes.test_schemas import valid_recipe
 
 TEST_DATABASE_URL = os.getenv("RESEARCH_DATA_TEST_DATABASE_URL")
@@ -349,6 +356,110 @@ def test_postgres_isolates_research_resources_between_users() -> None:
                 assert stored_job is not None
                 assert stored_job.status is JobStatus.FAILED
                 assert await outputs.get_export(second_export_id, second_user_id) is not None
+        finally:
+            await clear_recipes(database)
+            await database.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_postgres_replays_expired_snapshots_after_provider_revision(
+    test_settings: Settings, tmp_path: Path
+) -> None:
+    async def scenario() -> None:
+        assert TEST_DATABASE_URL is not None
+        database = Database(TEST_DATABASE_URL)
+        await clear_recipes(database)
+        settings = test_settings.model_copy(update={"artifact_root": tmp_path})
+        world_bank = RevisionFixture(DataProvider.WORLD_BANK, "2.5")
+        fred = RevisionFixture(DataProvider.FRED, "3.6")
+        registry = ProviderRegistry([cast(ProviderConnector, item) for item in (world_bank, fred)])
+        app = create_app(settings, database, registry)
+
+        def worker(providers: ProviderRegistry, config: Settings = settings) -> BuildWorker:
+            return BuildWorker(
+                database,
+                BuildJobExecutor(database, providers, config),
+                worker_id="replay-test",
+                lease_seconds=60,
+                poll_seconds=1,
+            )
+
+        try:
+            definition = fixture_recipe()
+            async with database.session() as session, session.begin():
+                owner = User(email="replay@example.com", password_hash="fixture", is_active=True)
+                session.add(owner)
+                await session.flush()
+                recipe = await RecipeRepository(session).create(owner.id, definition)
+                version = (
+                    await RecipeVersionRepository(session).freeze(recipe, definition)
+                ).version
+                plan = await BuildPlanner(registry).plan(version)
+                build = (
+                    await BuildRepository(session).create_or_get(owner.id, version.id, plan)
+                ).build
+                await BuildJobRepository(session).enqueue(build)
+
+            app.dependency_overrides[require_user] = lambda: owner
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                assert await worker(registry).run_once()
+                source_path = f"/api/v1/builds/{build.id}"
+                original = (await client.get(source_path)).json()
+                assert original["status"] == "succeeded"
+                assert original["can_replay"]
+
+                world_bank.value = Decimal("2.7")
+                refresh = await client.post(f"{source_path}/rerun?mode=refresh")
+                assert refresh.status_code == 202, refresh.text
+                assert await worker(registry).run_once()
+                refreshed_path = f"/api/v1/builds/{refresh.json()['build_id']}"
+                refreshed = (await client.get(refreshed_path)).json()
+                assert refreshed["status"] == "succeeded"
+                assert original["dataset_checksum"] != refreshed["dataset_checksum"]
+
+                async with database.session() as session, session.begin():
+                    await session.execute(
+                        update(ProviderInputCache).values(
+                            expires_at=datetime(2020, 1, 1, tzinfo=UTC)
+                        )
+                    )
+                replay = await client.post(f"{source_path}/rerun?mode=replay")
+                assert replay.status_code == 202, replay.text
+                assert await worker(ProviderRegistry([])).run_once()
+                replay_path = f"/api/v1/builds/{replay.json()['build_id']}"
+                replayed = (await client.get(replay_path)).json()
+                assert replayed["status"] == "succeeded"
+                assert replayed["replay_matches"] is True
+                assert replayed["replay_of_id"] == str(build.id)
+                assert original["dataset_checksum"] == replayed["dataset_checksum"]
+                assert replayed["replay_version_warning"] is None
+
+                new_settings = settings.model_copy(
+                    update={
+                        "transformer_version": "new-revision",
+                        "artifact_root": tmp_path / "new",
+                    }
+                )
+                drift = await client.post(f"{source_path}/rerun?mode=replay")
+                assert drift.status_code == 202, drift.text
+                assert await worker(ProviderRegistry([]), new_settings).run_once()
+                drift_path = f"/api/v1/builds/{drift.json()['build_id']}"
+                rebuilt = (await client.get(drift_path)).json()
+                assert rebuilt["transformer_version"] == "new-revision"
+                assert rebuilt["original_transformer_version"] == original["transformer_version"]
+                assert "Transformer version changed" in rebuilt["replay_version_warning"]
+                assert rebuilt["replay_matches"] is True
+
+                for path, expected in (
+                    (source_path, "2.5"),
+                    (refreshed_path, "2.7"),
+                    (replay_path, "2.5"),
+                ):
+                    preview = (await client.get(f"{path}/preview")).json()
+                    assert Decimal(str(preview["rows"][0]["gdp_growth"])) == Decimal(expected)
         finally:
             await clear_recipes(database)
             await database.dispose()

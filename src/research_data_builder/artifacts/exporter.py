@@ -29,6 +29,8 @@ def export_research_bundle(
     validation: ValidationReport,
     entity_mapping_version: str,
     application_version: str,
+    transformer_version: str | None = None,
+    deployment_commit: str | None = None,
 ) -> BundleResult:
     """Write a complete local bundle under a controlled build-specific directory."""
     if not validation.passed:
@@ -84,6 +86,10 @@ def export_research_bundle(
             "manifest lists pre-manifest artifacts; checksums.sha256 lists all files except itself"
         ),
     }
+    if transformer_version is not None:
+        manifest["transformer_version"] = transformer_version
+    if deployment_commit is not None:
+        manifest["deployment_commit"] = deployment_commit
     manifest_artifact = _write_artifact(
         directory, "manifest.json", "manifest", _json_bytes(manifest)
     )

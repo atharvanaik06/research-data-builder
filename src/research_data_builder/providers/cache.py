@@ -125,6 +125,23 @@ class ProviderObservationCache:
             )
         return observations
 
+    async def load_saved(self, build_id: UUID) -> dict[str, list[Observation]]:
+        """Read pinned snapshots regardless of their expiry, with no live fallback."""
+        async with self.database.session() as session:
+            rows = await session.execute(
+                select(BuildInput.output_name, ProviderInputCache)
+                .join(ProviderInputCache, BuildInput.cache_entry_id == ProviderInputCache.id)
+                .where(BuildInput.build_run_id == build_id)
+            )
+            snapshots = {}
+            for name, entry in rows:
+                payload = _canonical_json(entry.observations).encode()
+                fingerprint = hashlib.sha256(payload).hexdigest()
+                if fingerprint != entry.response_fingerprint:
+                    raise ValueError(f"Saved input checksum does not match for {name}")
+                snapshots[name] = [observation_from_dict(item) for item in entry.observations]
+            return snapshots
+
     @staticmethod
     async def _record_use(
         session: Any,

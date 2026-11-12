@@ -1,6 +1,6 @@
 """Execute a resolved build plan into one deterministic research table."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import date
 from typing import cast
 
@@ -42,16 +42,27 @@ class BuildExecutor:
         self.providers = providers
         self.observation_loader = observation_loader
 
-    async def execute(self, version: RecipeVersion, plan: BuildPlan) -> ExecutionResult:
+    async def execute(
+        self,
+        version: RecipeVersion,
+        plan: BuildPlan,
+        *,
+        saved_inputs: Mapping[str, list[Observation]] | None = None,
+    ) -> ExecutionResult:
         if str(version.id) != plan.recipe_version_id:
             raise ValueError("build plan does not belong to recipe version")
         if version.content_hash != plan.recipe_content_hash:
             raise ValueError("build plan recipe hash does not match frozen version")
 
         definition = RecipeDefinition.model_validate(version.content)
+        if saved_inputs is not None and saved_inputs.keys() != {
+            item.output_name for item in plan.inputs
+        }:
+            raise ValueError("Replay requires a saved snapshot for every planned input")
         frames: dict[str, pl.DataFrame] = {}
         for item in plan.inputs:
-            frames[item.output_name] = await self._execute_input(definition, item)
+            saved = saved_inputs[item.output_name] if saved_inputs is not None else None
+            frames[item.output_name] = await self._execute_input(definition, item, saved)
 
         joined, reports = join_variables(
             frames,
@@ -68,9 +79,8 @@ class BuildExecutor:
         self,
         definition: RecipeDefinition,
         item: ResolvedBuildInput,
+        saved: list[Observation] | None,
     ) -> pl.DataFrame:
-        provider = DataProvider(item.provider)
-        connector = self.providers.get(provider)
         request = item.request
         query = ObservationQuery(
             indicator_id=item.indicator_id,
@@ -78,12 +88,18 @@ class BuildExecutor:
             start_date=date.fromisoformat(str(request["start_date"])),
             end_date=date.fromisoformat(str(request["end_date"])),
         )
-        if self.observation_loader is None:
-            observations = await connector.get_observations(query)
+        if saved is not None:
+            observations = saved
+            geographic = bool(query.entity_ids)
         else:
-            observations = await self.observation_loader(item.output_name, connector, query)
+            connector = self.providers.get(DataProvider(item.provider))
+            geographic = connector.capabilities.geographic_filtering
+            if self.observation_loader is None:
+                observations = await connector.get_observations(query)
+            else:
+                observations = await self.observation_loader(item.output_name, connector, query)
         frame = observations_to_long(observations, output_name=item.output_name)
-        frame = self._bound_frame(frame, definition, connector.capabilities.geographic_filtering)
+        frame = self._bound_frame(frame, definition, geographic)
 
         source_frequency = Frequency(str(item.indicator_metadata["frequency"]))
         method = self._aggregation_method(definition, item.output_name)

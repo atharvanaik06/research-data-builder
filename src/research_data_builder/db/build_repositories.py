@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from research_data_builder.db.models import BuildInput, BuildRun, BuildStatus
+from research_data_builder.db.models import BuildInput, BuildRun, BuildStatus, RecipeVersion
 from research_data_builder.engine.result import ExecutionResult
 from research_data_builder.recipes.planner import BuildPlan
 
@@ -121,6 +121,33 @@ class BuildRepository:
         """Create a new planned row for one failed or cancelled attempt."""
         if build.status not in {BuildStatus.FAILED, BuildStatus.CANCELLED}:
             raise BuildTransitionError(build.status, BuildStatus.PLANNED)
+        return await self._create_attempt(build, replay_of_id=build.replay_of_id)
+
+    async def create_rerun(self, build: BuildRun, *, replay: bool) -> BuildRun:
+        """Run a completed plan again, optionally pinning its original snapshots."""
+        if build.status is not BuildStatus.SUCCEEDED:
+            raise BuildTransitionError(build.status, BuildStatus.PLANNED)
+        if replay and not await self.can_replay(build):
+            raise ValueError("This build does not have a complete set of saved inputs.")
+        return await self._create_attempt(build, replay_of_id=build.id if replay else None)
+
+    async def can_replay(self, build: BuildRun) -> bool:
+        if build.status is not BuildStatus.SUCCEEDED or not build.dataset_checksum:
+            return False
+        saved_names = await self.session.scalars(
+            select(BuildInput.output_name).where(
+                BuildInput.build_run_id == build.id, BuildInput.cache_entry_id.is_not(None)
+            )
+        )
+        return set(saved_names) == {item["output_name"] for item in build.plan["inputs"]}
+
+    async def _create_attempt(self, build: BuildRun, *, replay_of_id: UUID | None) -> BuildRun:
+        # Serialize attempt-number allocation across reruns and retries of the same version.
+        await self.session.execute(
+            select(RecipeVersion.id)
+            .where(RecipeVersion.id == build.recipe_version_id)
+            .with_for_update()
+        )
         latest_attempt = await self.session.scalar(
             select(func.max(BuildRun.attempt_number)).where(
                 BuildRun.owner_id == build.owner_id,
@@ -135,6 +162,7 @@ class BuildRepository:
             build_identity=build.build_identity,
             attempt_number=(latest_attempt or build.attempt_number) + 1,
             plan=build.plan,
+            replay_of_id=replay_of_id,
         )
         self.session.add(retry)
         await self.session.flush()
@@ -147,6 +175,9 @@ class BuildRepository:
             self.session.add(
                 BuildInput(
                     build_run_id=retry.id,
+                    cache_entry_id=item.cache_entry_id if replay_of_id else None,
+                    cache_status="replay" if replay_of_id else None,
+                    retrieved_at=item.retrieved_at if replay_of_id else None,
                     output_name=item.output_name,
                     provider=item.provider,
                     indicator_id=item.indicator_id,

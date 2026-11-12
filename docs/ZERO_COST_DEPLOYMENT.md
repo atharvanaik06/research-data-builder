@@ -77,3 +77,16 @@ The storage layer verifies each SHA-256 checksum before it serves a download. It
 For production, use separate API and worker services. Use SQS for worker messages and S3 for artifacts. Use RDS for PostgreSQL.
 
 The AWS Terraform files describe that target design. They also describe private networks, encryption, backups, and failure recovery.
+
+## Verify hosted replay after a restart
+
+1. Run a small FRED and World Bank build. Save the build ID and logical dataset checksum.
+   Download the bundle and check its manifest for the transformer version and deployment commit.
+2. Restart the service from Render and confirm a new instance is serving requests.
+   Open the original build by ID and download an original artifact again. Replay its
+   saved inputs and confirm the checksum matches. This exercises PostgreSQL snapshots
+   and object storage across a process restart.
+3. Check whether Neon suspended compute before testing the first database-backed
+   request after idle. Render traffic or the worker's polling can prevent suspension.
+   Confirm the request succeeds and check logs for stale connection errors.
+   SQLAlchemy uses `pool_pre_ping=True` to check pooled connections on checkout.
